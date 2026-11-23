@@ -216,7 +216,8 @@ pub fn load(path: &Path) -> LoadOutcome {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return LoadOutcome::Fresh(Settings::default()),
         Err(e) => return recover(path, e.to_string()),
     };
-    match serde_json::from_str(&text) {
+    // Editors like older Notepad / PowerShell 5 write a UTF-8 BOM, which serde_json rejects.
+    match serde_json::from_str(text.trim_start_matches('\u{feff}')) {
         Ok(s) => LoadOutcome::Loaded(s),
         Err(e) => recover(path, e.to_string()),
     }
@@ -255,6 +256,14 @@ mod tests {
         std::fs::write(&p, r#"{"mode":"concise","llm":{"timeout_ms":900}}"#).unwrap();
         let s = load(&p).settings();
         assert_eq!((s.mode, s.llm.timeout_ms, s.llm.port), (Mode::Concise, 900, 18080));
+    }
+
+    #[test]
+    fn utf8_bom_is_accepted() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        std::fs::write(&p, "\u{feff}{\"mode\":\"math\"}").unwrap();
+        assert!(matches!(load(&p), LoadOutcome::Loaded(s) if s.mode == Mode::Math));
     }
 
     #[test]

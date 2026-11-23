@@ -125,7 +125,8 @@ pub fn decode_wav(bytes: &[u8]) -> Result<(Vec<f32>, u32), String> {
             let frames = body.chunks_exact(2 * channels as usize);
             let mono = frames
                 .map(|f| {
-                    let sum: f32 = f.as_chunks::<2>().0.iter().map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).sum();
+                    let sum: f32 =
+                        f.as_chunks::<2>().0.iter().map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).sum();
                     sum / channels as f32
                 })
                 .collect();

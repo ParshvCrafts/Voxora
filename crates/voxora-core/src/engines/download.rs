@@ -57,15 +57,6 @@ pub const CATALOG: &[Asset] = &[
         bytes: 358_031_782,
     },
     Asset {
-        id: "llama-cudart",
-        label: "CUDA 12.4 runtime for llama.cpp",
-        kind: Kind::Runtime,
-        file: "cudart-llama-bin-win-cuda-12.4-x64.zip",
-        url: "https://github.com/ggml-org/llama.cpp/releases/download/b12649/cudart-llama-bin-win-cuda-12.4-x64.zip",
-        sha256: "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
-        bytes: 391_443_627,
-    },
-    Asset {
         id: "llama-cpu",
         label: "llama.cpp b12649 server (CPU)",
         kind: Kind::Runtime,
