@@ -1,0 +1,29 @@
+# Build output
+/target/
+node_modules/
+dist/
+src-tauri/gen/schemas/
+
+# Secrets (never commit)
+.env*
+!.env.example
+*.pem
+*.key
+credentials.json
+serviceAccount*.json
+
+# Generated / large
+bench/audio/
+*.gguf
+*.bin
+*.zip
+*.wav
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.claude/settings.local.json
