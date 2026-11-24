@@ -232,7 +232,13 @@ fn open_stream(
 
     let err_cb = {
         let on_event = on_event.clone();
-        move |e: cpal::Error| on_event(Event::StreamError(e.to_string()))
+        move |e: cpal::Error| {
+            if ends_stream(e.kind()) {
+                on_event(Event::StreamError(e.to_string()));
+            } else {
+                tracing::debug!("audio stream hiccup, recording continues: {e}");
+            }
+        }
     };
     let stream_cfg: cpal::StreamConfig = cfg.config();
     let stream = match cfg.sample_format() {
@@ -303,9 +309,24 @@ fn linear_resample(input: &[f32], rate: u32) -> Vec<f32> {
         .collect()
 }
 
+/// Whether a cpal stream error means the recording is over. Laptop mics often report one buffer
+/// overrun as the stream starts; treating that as "disconnected" cancelled every dictation on
+/// the built-in Realtek mic (v0.2.0 bug). Glitches and automatic reroutes keep the stream alive.
+fn ends_stream(kind: cpal::ErrorKind) -> bool {
+    !matches!(kind, cpal::ErrorKind::Xrun | cpal::ErrorKind::DeviceChanged | cpal::ErrorKind::RealtimeDenied)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buffer_glitches_do_not_cancel_a_dictation() {
+        assert!(!ends_stream(cpal::ErrorKind::Xrun), "an overrun at stream start must not cancel");
+        assert!(!ends_stream(cpal::ErrorKind::DeviceChanged), "a rerouted stream keeps running");
+        assert!(ends_stream(cpal::ErrorKind::DeviceNotAvailable), "an unplugged mic does end it");
+        assert!(ends_stream(cpal::ErrorKind::StreamInvalidated));
+    }
 
     fn sine(rate: u32, secs: f32, hz: f32) -> Vec<f32> {
         (0..(rate as f32 * secs) as usize)

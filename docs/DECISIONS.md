@@ -101,3 +101,15 @@ known extension/TLD), so prose like "the red dot" is never glued together.
   launch with the event tap installed. Labelled beta until someone confirms by hand.
 - Bundle identifier changed from `dev.voxora.app` to `dev.voxora.desktop` (an `.app` suffix
   clashes with macOS bundles); safe because no installer had been published.
+
+## D14: Audio glitches must not cancel a dictation (2026-11-24, v0.2.1)
+Bug reported on the owner's laptop: holding Right Alt did nothing. Instrumented each stage:
+the hook delivered the key, recording started, and 50 ms later the built-in Realtek mic
+reported one WASAPI buffer overrun (`cpal::ErrorKind::Xrun`). The engine treated every stream
+error as "microphone disconnected" and cancelled, so the HUD vanished before it was visible.
+Earlier end-to-end tests used the VB-Audio virtual cable, which never overruns, so they could
+not catch it. Fix: only errors that end the stream cancel; `Xrun`, `DeviceChanged` and
+`RealtimeDenied` are logged at debug level and recording continues (regression test
+`buffer_glitches_do_not_cancel_a_dictation`). Also added stage logs ("recording started",
+gesture input/action at debug) so the next report can be diagnosed from the log alone.
+Lesson: run the real-hardware check on the default microphone, not only the virtual cable.

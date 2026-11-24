@@ -285,6 +285,7 @@ impl Engine {
             }
         };
         let action = self.gesture.lock().unwrap().feed(input);
+        tracing::debug!(?input, ?action, "gesture");
         match action {
             Action::None => {}
             Action::Start => self.start_recording().await,
@@ -301,6 +302,7 @@ impl Engine {
         let id = self.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
         *self.session.lock().unwrap() = Some(Session { id, target, profile });
         hotkey::set_recording(true);
+        tracing::info!(app = %self.session.lock().unwrap().as_ref().map(|s| s.target.ctx.exe.clone()).unwrap_or_default(), mode = ?profile.mode, "recording started");
         self.overlay("listening", None, false);
 
         let audio = self.audio.clone();
