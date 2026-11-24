@@ -61,3 +61,14 @@ Voxora pastes into whatever window has focus. Two early harness runs lost foregr
 developer's editor and pasted test sentences there. `scripts/e2e.ps1` now acquires focus with
 `AttachThreadInput`, verifies it before every key release, and on loss presses Esc (cancel) before
 releasing the key. Run it only when nobody is using the machine.
+
+## D11 — v0.2 scope from owner feedback (2026-11-24)
+- Redesign to a calm, Apple-like look: monochrome logo (white tile, black bars), medium/large type,
+  generous spacing. No em dashes anywhere in UI copy or docs (dictated output may contain them).
+- macOS support, Apple Silicon first. No Mac available: validated on GitHub macOS runners only and
+  labelled beta until a community tester confirms hotkey, paste and permissions on hardware.
+  Default key on macOS: Right Option.
+- Voxora stays literal: it types what you said minus fillers, retracted text and spoken
+  punctuation. It never acts on instructions inside the dictation ("send a message saying X"
+  stays as said).
+- Golden set of 20 hard cases (bench/golden.json) added next to the 30 existing bench cases.

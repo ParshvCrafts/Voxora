@@ -36,6 +36,15 @@ struct Case {
     /// Extra personal-dictionary terms for this case (simulates a user who added them).
     #[serde(default)]
     terms: Vec<String>,
+    /// The ideal output. Scored separately from the key-fact checks (whitespace-insensitive).
+    #[serde(default)]
+    target: Option<String>,
+    /// WAV to use instead of `<id>.wav` (e.g. a noise-only clip).
+    #[serde(default)]
+    audio: Option<String>,
+    /// Nothing may be inserted (noise / silence cases).
+    #[serde(default)]
+    expect_empty: bool,
 }
 
 struct Row {
@@ -46,6 +55,7 @@ struct Row {
     path: Path,
     wer: Option<f64>,
     pass: bool,
+    exact: Option<bool>,
     why: String,
     asr_ms: Vec<u64>,
     text_ms: Vec<u64>,
@@ -94,7 +104,31 @@ fn pct(v: &[u64], p: f64) -> u64 {
     s[((s.len() as f64 - 1.0) * p).round() as usize]
 }
 
+/// Whitespace-insensitive comparison against the ideal output.
+fn exact(target: &str, out: &str) -> bool {
+    let squash = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+    squash(target) == squash(out)
+}
+
+/// The reference for WER: the spoken text without stage directions like `[pause 3500]`.
+fn spoken_words(s: &str) -> String {
+    let mut out = String::new();
+    let mut depth = 0;
+    for ch in s.chars() {
+        match ch {
+            '[' => depth += 1,
+            ']' => depth -= 1,
+            _ if depth == 0 => out.push(ch),
+            _ => {}
+        }
+    }
+    out
+}
+
 fn judge(c: &Case, out: &str) -> (bool, String) {
+    if c.expect_empty {
+        return if out.trim().is_empty() { (true, String::new()) } else { (false, "expected nothing".into()) };
+    }
     if let Some(e) = &c.expect_exact
         && out != e
     {
@@ -137,6 +171,9 @@ async fn main() {
 
     let mut rows = Vec::new();
     for c in &cases {
+        if c.spoken.is_empty() && audio.is_none() {
+            continue; // audio-only case (noise) in a text-only run
+        }
         let mut d = settings.dictionary.clone();
         d.terms.extend(c.terms.iter().cloned());
         let dict = DictMatcher::new(&d);
@@ -150,14 +187,15 @@ async fn main() {
             path: Path::Deterministic,
             wer: None,
             pass: false,
+            exact: None,
             why: String::new(),
             asr_ms: vec![],
             text_ms: vec![],
         };
         for run in 0..runs {
             let raw = if let Some(dir) = &audio {
-                let bytes = std::fs::read(dir.join(format!("{}.wav", c.id)))
-                    .expect("missing case WAV; run scripts/gen-bench-audio.ps1");
+                let file = c.audio.clone().unwrap_or(format!("{}.wav", c.id));
+                let bytes = std::fs::read(dir.join(file)).expect("missing case WAV; run scripts/gen-bench-audio.ps1");
                 let (samples, rate) = decode_wav(&bytes).expect("decode wav");
                 assert_eq!(rate, 16_000, "bench WAVs must be 16 kHz");
                 let t = Instant::now();
@@ -165,7 +203,7 @@ async fn main() {
                 row.asr_ms.push(t.elapsed().as_millis() as u64);
                 asr_filter::clean(&tr.text, 10_000).unwrap_or_default()
             } else {
-                c.spoken.clone()
+                spoken_words(&c.spoken).split_whitespace().collect::<Vec<_>>().join(" ")
             };
             let t = Instant::now();
             let o = pipeline::process(
@@ -184,8 +222,9 @@ async fn main() {
             .await;
             row.text_ms.push(t.elapsed().as_millis() as u64);
             if run == 0 {
-                row.wer = audio.as_ref().map(|_| wer(&c.spoken, &raw));
+                row.wer = audio.as_ref().filter(|_| !c.spoken.is_empty()).map(|_| wer(&spoken_words(&c.spoken), &raw));
                 (row.pass, row.why) = judge(c, &o.text);
+                row.exact = c.target.as_deref().filter(|_| !c.expect_empty).map(|t| exact(t, &o.text));
                 row.raw = raw;
                 row.out = o.text;
                 row.path = o.path;
@@ -230,7 +269,18 @@ fn render(rows: &[Row], silence: Option<Option<String>>, runs: usize, audio: boo
 
     let mut s = String::new();
     s += "## Summary\n\n";
-    s += &format!("- Cases: **{passed}/{} passed** ({runs} runs each; quality judged on run 1)\n", rows.len());
+    s += &format!(
+        "- Cases: **{passed}/{} passed** key-fact checks ({runs} runs each; quality judged on run 1)\n",
+        rows.len()
+    );
+    let scored: Vec<bool> = rows.iter().filter_map(|r| r.exact).collect();
+    if !scored.is_empty() {
+        s += &format!(
+            "- Exact match with the ideal output: **{}/{}** (whitespace-insensitive)\n",
+            scored.iter().filter(|e| **e).count(),
+            scored.len()
+        );
+    }
     s += &format!(
         "- Input: {}; rewrite LLM: {}\n",
         if audio { "synthesized speech → whisper-server" } else { "reference text (ASR bypassed)" },
@@ -273,7 +323,7 @@ fn render(rows: &[Row], silence: Option<Option<String>>, runs: usize, audio: boo
     );
     s += &format!("| ASR + rewrite | {} ms | {} ms | {} |\n\n", pct(&totals, 0.5), pct(&totals, 0.95), totals.len());
 
-    s += "## Cases\n\n| | Case | Path | WER | Output | Note |\n|---|---|---|---|---|---|\n";
+    s += "## Cases\n\n| | Exact | Case | Path | WER | Output | Note |\n|---|---|---|---|---|---|---|\n";
     for r in rows {
         let path = match &r.path {
             Path::Llm => "llm".to_string(),
@@ -283,8 +333,13 @@ fn render(rows: &[Row], silence: Option<Option<String>>, runs: usize, audio: boo
         };
         let esc = |t: &str| t.replace('|', "\\|").replace('\n', "⏎");
         s += &format!(
-            "| {} | `{}` {} | {} | {} | {} | {} |\n",
+            "| {} | {} | `{}` {} | {} | {} | {} | {} |\n",
             if r.pass { "✅" } else { "❌" },
+            match r.exact {
+                Some(true) => "=",
+                Some(false) => "≠",
+                None => "",
+            },
             r.id,
             r.category,
             path,

@@ -53,6 +53,11 @@ impl Default for Settings {
                     "CUDA",
                     "FAISS",
                     "BM25",
+                    "WebSocket",
+                    "Redis",
+                    "PostgreSQL",
+                    "Kubernetes",
+                    "JavaScript",
                 ]
                 .map(String::from)
                 .to_vec(),

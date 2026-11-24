@@ -36,8 +36,8 @@ impl Rewriter for OpenAiCompat {
         let body = json!({
             "model": self.model,
             "messages": messages,
-            "temperature": 0.1,
-            "top_p": 0.9,
+            // Greedy: a rewrite should be reproducible, not creative.
+            "temperature": 0.0,
             "max_tokens": max_tokens,
             "stream": false,
             "response_format": prompts::response_format(),

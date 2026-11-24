@@ -296,6 +296,22 @@ const BOUND: Ctx = Ctx { of: false, given: false };
 struct Parser<'a> {
     t: &'a [Tok],
     pos: usize,
+    /// Capital letters the speaker clearly meant (see [`deliberate_capitals`]).
+    caps: &'a [String],
+}
+
+/// Whisper capitalizes single letters at random, so variables default to lowercase. A letter
+/// written uppercase at least twice and never lowercase ("one over N ... to N") is deliberate.
+fn deliberate_capitals(toks: &[Tok]) -> Vec<String> {
+    let mut out = Vec::new();
+    for t in toks.iter().filter(|t| t.raw.len() == 1 && t.raw.chars().all(|c| c.is_ascii_uppercase()) && t.raw != "I") {
+        let upper = toks.iter().filter(|x| x.raw == t.raw).count();
+        let lower = toks.iter().filter(|x| x.raw == t.low).count();
+        if upper >= 2 && lower == 0 && !out.contains(&t.raw) {
+            out.push(t.raw.clone());
+        }
+    }
+    out
 }
 
 impl<'a> Parser<'a> {
@@ -537,6 +553,14 @@ impl<'a> Parser<'a> {
             });
         }
         // Number (digits or a number word), with "2 point 5" decimals.
+        // ASR writes "negative one" as "-1".
+        if let Some(rest) = t.raw.strip_prefix('-')
+            && !rest.is_empty()
+            && rest.chars().all(|c| c.is_ascii_digit() || c == '.')
+        {
+            self.pos += 1;
+            return Some(Expr::Neg(b(Expr::Num(rest.to_string()))));
+        }
         if let Some(n) = number(t) {
             self.pos += 1;
             if let Some(frac) = self.attempt(|p| {
@@ -594,7 +618,8 @@ impl<'a> Parser<'a> {
                     });
             }
             self.pos += 1;
-            return Some(Expr::Var(w.to_string()));
+            let name = if self.caps.contains(&t.raw) { t.raw.clone() } else { w.to_string() };
+            return Some(Expr::Var(name));
         }
         None
     }
@@ -930,7 +955,14 @@ fn tex(e: &Expr) -> String {
         Expr::Greek(name, _) => format!("\\{name}"),
         Expr::Const(l, _) => l.to_string(),
         Expr::Neg(x) => format!("-{}", wrap(x)),
+        // "one over N times sigma ...": a big operator after × reads as plain juxtaposition.
+        Expr::Bin("\\times", _, l, r) if matches!(**r, Expr::BigOp { .. }) => format!("{} {}", tex(l), tex(r)),
         Expr::Bin(op, _, l, r) | Expr::Rel(op, _, l, r) => format!("{} {op} {}", tex(l), tex(r)),
+        // "negative one over N" → -\frac{1}{N}, the conventional placement of the sign.
+        Expr::Frac(n, d) if matches!(**n, Expr::Neg(_)) => {
+            let Expr::Neg(inner) = &**n else { unreachable!() };
+            format!("-\\frac{{{}}}{{{}}}", tex(inner), tex(d))
+        }
         Expr::Frac(n, d) => format!("\\frac{{{}}}{{{}}}", tex(n), tex(d)),
         Expr::Juxt(items) => {
             let mut s = String::new();
@@ -980,6 +1012,7 @@ fn tex(e: &Expr) -> String {
 /// Everything outside the spans is copied byte-for-byte.
 pub fn convert(text: &str, style: MathStyle) -> String {
     let toks = tokenize(text);
+    let caps = deliberate_capitals(&toks);
     let lone_greek = style == MathStyle::Latex;
     let mut out = String::with_capacity(text.len() + 8);
     let mut copied_to = 0;
@@ -989,7 +1022,15 @@ pub fn convert(text: &str, style: MathStyle) -> String {
             i += 1;
             continue;
         }
-        let mut p = Parser { t: &toks, pos: i };
+        // Spans an earlier stage already formatted (e.g. `O(V + E log V)`) are left alone.
+        if toks[i].raw.contains(OPEN) {
+            while i < toks.len() && !toks[i].raw.contains(CLOSE) {
+                i += 1;
+            }
+            i += 1;
+            continue;
+        }
+        let mut p = Parser { t: &toks, pos: i, caps: &caps };
         let parsed = p.relation(TOP).filter(|e| e.is_structural(lone_greek));
         match parsed {
             Some(e) if p.pos > i && (p.pos - i >= 2 || lone_greek) => {
@@ -1077,6 +1118,16 @@ mod tests {
         assert_eq!(l("x is not equal to 0"), r"x \neq 0");
         assert_eq!(u("x to the nth"), "xⁿ");
         assert_eq!(l("capital A inverse"), "A^{-1}");
+    }
+
+    #[test]
+    fn golden_cross_entropy_keeps_repeated_capital_and_sign() {
+        assert_eq!(
+            l(
+                "Write the loss function as negative one over N times sigma from i equals 1 to N of y sub i log y hat sub i."
+            ),
+            r"Write the loss function as $-\frac{1}{N} \sum_{i=1}^{N} y_i \log(\hat{y}_i)$."
+        );
     }
 
     #[test]

@@ -83,7 +83,11 @@ pub fn needs_llm(raw: &str, mode: Mode, fast_path_words: usize) -> bool {
 fn has_repeat(raw: &str) -> bool {
     let w: Vec<String> =
         raw.split_whitespace().map(|x| x.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase()).collect();
-    w.windows(2).any(|p| !p[0].is_empty() && p[0] == p[1] && !["that", "had"].contains(&p[0].as_str()))
+    w.windows(2).any(|p| {
+        !p[0].is_empty()
+            && p[0] == p[1]
+            && !["that", "had", "slash", "backslash", "dash", "underscore", "dot"].contains(&p[0].as_str())
+    })
 }
 
 pub async fn process<R: Rewriter>(req: Request<'_>, llm: Option<&R>) -> Outcome {
