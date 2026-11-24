@@ -78,21 +78,21 @@ release to paste completion (`total_ms` in the history database).
 
 | Check | Result |
 |---|---|
-| Push-to-talk inserts text; self-correction resolved ("â€¦Wednesday at 4:30 p.m.") | pass |
+| Push-to-talk inserts text; self-correction resolved ("...Wednesday at 4:30 p.m.") | pass |
 | Previous clipboard text restored after the paste | pass |
 | Hands-free (tap) stops by itself after silence | pass |
 | Esc cancels, nothing inserted | pass |
 | 5 s of silence, nothing inserted | pass |
-| Spoken math ("x squared plus y squared equals z squared" â†’ `xÂ² + yÂ² = zÂ²`) | pass |
+| Spoken math ("x squared plus y squared equals z squared" → `x² + y² = z²`) | pass |
 
-| Path | Key release â†’ text inserted (7 dictations, release build) |
+| Path | Key release → text inserted (7 dictations, release build) |
 |---|---|
-| Rule-based only (LLM skipped) | 453 â€“ 765 ms |
-| With LLM rewrite | 847 â€“ 1235 ms |
+| Rule-based only (LLM skipped) | 453 to 765 ms |
+| With LLM rewrite | 847 to 1235 ms |
 
 Breakdown of the slowest case (8.7 s utterance with a self-correction): ASR 532 ms, LLM 343 ms,
 paste 7 ms. whisper-server is ~2x slower on the first request after a few seconds idle than
-back-to-back (410â€“560 ms vs ~200 ms for the same clip), which is why in-app ASR is above the
+back-to-back (410 to 560 ms vs ~200 ms for the same clip), which is why in-app ASR is above the
 `bench_eval` numbers; see [D9](DECISIONS.md) for what was tried.
 
 ## 3. Footprint

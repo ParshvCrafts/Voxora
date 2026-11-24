@@ -51,7 +51,7 @@ into `\sum_{i=1}^{n} x_i`.
   ("lang graph" becomes LangGraph); phrase shortcuts expand into longer text.
 
 <p align="center">
-  <img src="docs/assets/home.png" width="760" alt="Voxora's main window in dark mode: a sidebar with Home, History, Dictionary, Modes and Apps, Settings; the Home page reads Hold Right Alt and speak, shows Speech ready and Rewrite ready with the GPU and its memory, usage stats, and a mode selector">
+  <img src="docs/assets/home.png" width="760" alt="Voxora's main window in dark mode: a sidebar with Home, History, Dictionary, Modes & Apps, Settings; the Home page reads Hold Right Alt and speak, shows Speech ready and Rewrite ready with the GPU and its memory, usage stats, and a mode selector">
 </p>
 
 ## How it works
@@ -78,8 +78,8 @@ flowchart LR
   pinned tag in CI and shipped inside `Voxora.app`. Any OpenAI-compatible server (Ollama, LM
   Studio) can replace the built-in rewrite engine.
 - **The LLM is optional by design.** Short, fluent speech skips it (the rules finish in under a
-  millisecond), and a timeout or guard rejection also falls back to the rules. Decoding is greedy,
-  so the same words give the same text every time.
+  millisecond), and a timeout or guard rejection also falls back to the rules. LLM decoding is greedy,
+  so the same transcript gives the same rewrite every time.
 - **Measured, not assumed.** Every default has a benchmark behind it in the
   [decision log](docs/DECISIONS.md), including ideas that were tried and dropped.
 
@@ -93,10 +93,10 @@ how to reproduce them: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 | | Result |
 |---|---|
 | Core benchmark (30 cases: fillers, self-corrections, ML jargon, code, math, prompt injection), synthesized speech | **29/30 pass** |
-| Golden set, 20 hard edge cases (URLs, paths, nested LaTeX, quotes, lists, Big-O, accented names, noise), Voxora's pipeline on reference text | **19/19 key facts, 16/19 exact** |
-| Same golden set through Whisper with robotic Windows TTS voices | 11/20 key facts (misses are mishearings like "Reedy's cache" for Redis) |
-| Speech recognition, warm (whisper large-v3-turbo Q8) | P50 ~200 ms, P95 ~260 ms |
-| AI rewrite when used (Qwen3.5-4B Q4_K_M) | P50 ~360 ms, P95 ~840 ms |
+| Golden set, 20 hard edge cases (URLs, paths, nested LaTeX, quotes, lists, Big-O, accented names, noise), Voxora's pipeline on reference text (the noise-only case needs audio, so 19 are scored) | **19/19 key facts, 16/19 exact** |
+| Same golden set as audio through Whisper, robotic Windows TTS voices | 11/20 key facts, 7/19 exact (misses are mishearings like "Reedy's cache" for Redis) |
+| Speech recognition, warm (whisper large-v3-turbo Q8, core benchmark) | P50 166 ms, P95 245 ms |
+| AI rewrite when used (Qwen3.5-4B Q4_K_M, core benchmark) | P50 357 ms, P95 929 ms |
 | End-to-end, key release to text in the app (real app, release build) | 0.45 to 0.77 s rule-based, 0.85 to 1.24 s with AI rewrite |
 | Silence or keyboard noise only | nothing inserted |
 | GPU memory, both models loaded | 4.3 GB of 8 GB |
@@ -155,7 +155,7 @@ Models and runtimes are not in the repo; the app downloads them on first run int
 Verified:
 - 79 unit tests on Windows, and the same core suite plus macOS key-map tests on macOS (text
   pipeline, golden-case rules, math parser, guard, storage, gesture timing, resampling, archive
-  safety), plus a live clipboard round-trip test on Windows.
+  safety), plus an opt-in live clipboard round-trip test on Windows (`cargo test -- --ignored`).
 - Windows, on the hardware above: `scripts/e2e.ps1` drives the real app through a virtual audio
   cable (push-to-talk, hands-free auto-stop, Esc cancel, silence rejection, self-correction,
   spoken math, clipboard restore), last run on v0.1; v0.2 was re-checked with unit tests, both
@@ -163,8 +163,9 @@ Verified:
   running.
 - macOS, on GitHub's Apple silicon runners for every push: clippy and tests on the macOS code,
   `.app` and `.dmg` bundling, the bundled whisper-server transcribing a spoken sentence
-  correctly, the pinned llama.cpp runtime passing its checksum and starting, and the app
-  launching and installing its keyboard listener.
+  correctly (with the tiny English model, to keep CI fast), the pinned llama.cpp runtime passing
+  its checksum and running, and the app launching, staying up, and installing its keyboard
+  listener (the runner grants Accessibility).
 
 Not yet verified:
 - **macOS on a real Mac.** No Mac was available while building this. Holding the key, the HUD,
@@ -197,5 +198,5 @@ MIT © Parshv Patel. Downloaded at runtime, not redistributed here:
 built from whisper.cpp source),
 [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) (MIT),
 [Qwen3.5](https://huggingface.co/Qwen/Qwen3.5-4B) (Apache-2.0),
-[Silero VAD](https://github.com/snakers4/silero-vad) (MIT),
-[Inter](https://rsms.me/inter/) (OFL).
+[Silero VAD](https://github.com/snakers4/silero-vad) (MIT).
+The app bundles the [Inter](https://rsms.me/inter/) typeface (OFL).

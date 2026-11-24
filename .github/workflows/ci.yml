@@ -116,6 +116,7 @@ jobs:
           LOG=$(ls -t "$HOME/Library/Application Support/Voxora/logs/"voxora*.log | head -1)
           cat "$LOG"
           grep -q "starting" "$LOG"
+          grep -q "keyboard event tap installed" "$LOG"
           ! grep -qi "panicked" "$LOG"
           kill $!
       - uses: actions/upload-artifact@v4
