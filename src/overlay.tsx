@@ -14,7 +14,8 @@ interface OverlayState {
   hands_free: boolean;
 }
 
-const BARS = 14;
+const BARS = 16;
+const MODE_NAMES: Record<string, string> = { CLEAN: "Clean", TECH: "Technical", MATH: "Math", BRIEF: "Concise", PRO: "Professional", RAW: "Verbatim" };
 
 function Pill() {
   const [state, setState] = useState<OverlayState>({ kind: "hidden", mode: "CLEAN", message: null, hands_free: false });
@@ -39,28 +40,28 @@ function Pill() {
     <div className={`pill ${visible ? "in" : "out"} ${state.kind}`} role="status" aria-live="polite">
       {state.kind === "listening" && (
         <>
-          <span className="dot" />
-          {state.hands_free && <Lock size={12} className="lock" aria-label="hands-free" />}
+          <span className="rec" />
+          {state.hands_free && <Lock size={13} className="lock" aria-label="hands-free" />}
           <span className="bars" aria-hidden>
             {levels.map((l, i) => (
-              <span key={i} style={{ height: `${Math.max(3, Math.min(22, 3 + l * 26))}px` }} />
+              <span key={i} style={{ height: `${Math.max(3, Math.min(22, 3 + l * 26))}px`, opacity: 0.45 + Math.min(0.55, l) }} />
             ))}
           </span>
         </>
       )}
       {state.kind === "processing" && (
-        <span className="wave" aria-label="processing">
+        <span className="thinking" aria-label="processing">
           <span />
           <span />
           <span />
         </span>
       )}
-      {state.kind === "done" && <Check size={16} className="ok" />}
-      {state.kind === "notice" && <Info size={15} className="info" />}
-      {state.kind === "warning" && <AlertTriangle size={15} className="warn" />}
-      {state.kind === "error" && <XCircle size={15} className="err" />}
+      {state.kind === "done" && <Check size={18} strokeWidth={2.5} className="ok" />}
+      {state.kind === "notice" && <Info size={17} className="info" />}
+      {state.kind === "warning" && <AlertTriangle size={17} className="warn" />}
+      {state.kind === "error" && <XCircle size={17} className="err" />}
       {state.message && <span className="msg">{state.message}</span>}
-      {!state.message && state.kind !== "done" && <span className="badge">{state.mode}</span>}
+      {!state.message && state.kind !== "done" && <span className="mode">{MODE_NAMES[state.mode] ?? state.mode}</span>}
     </div>
   );
 }

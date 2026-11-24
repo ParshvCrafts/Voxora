@@ -257,7 +257,7 @@ impl Engine {
                 return;
             }
             Msg::Audio(audio::Event::DeadMic) => {
-                self.overlay("warning", Some("No microphone input — is it muted?".into()), false);
+                self.overlay("warning", Some("No sound from the mic. Is it muted?".into()), false);
                 return;
             }
             Msg::Audio(audio::Event::StreamError(e)) => {
@@ -355,7 +355,12 @@ impl Engine {
             if let Err(e) = self.start_asr().await {
                 tracing::error!("speech engine unavailable: {e}");
                 *self.failed_audio.lock().unwrap() = Some((rec, target, profile));
-                self.overlay_with_mode("error", mode, Some("Speech engine failed — see Settings".into()), false);
+                self.overlay_with_mode(
+                    "error",
+                    mode,
+                    Some("Speech engine stopped. Restart it in Settings.".into()),
+                    false,
+                );
                 return self.overlay_hide_after(3500);
             }
         }
@@ -378,7 +383,7 @@ impl Engine {
                         self.overlay_with_mode(
                             "error",
                             mode,
-                            Some("Transcription failed — Retry from tray".into()),
+                            Some("Couldn't transcribe. Retry from the tray.".into()),
                             false,
                         );
                         return self.overlay_hide_after(3500);
@@ -445,9 +450,9 @@ impl Engine {
             }
             _ => {
                 let msg = if target.ctx.elevated {
-                    "Copied — press Ctrl+V (admin window)".to_string()
+                    "Admin window: press Ctrl+V to paste".to_string()
                 } else {
-                    "Copied to clipboard — paste manually".to_string()
+                    "Copied. Paste it with Ctrl+V.".to_string()
                 };
                 self.overlay_with_mode("notice", mode, Some(msg), false);
                 self.overlay_hide_after(3000);
@@ -524,7 +529,7 @@ impl Engine {
         let profile = resolve(&ctx, &s.app_rules, s.mode, s.auto_context);
         let (status, _, _) = self.insert(last.best_text(), &ctx, profile, &s).await;
         if status != RowStatus::Inserted {
-            self.overlay("notice", Some("Copied to clipboard — paste manually".into()), false);
+            self.overlay("notice", Some("Copied. Paste it with Ctrl+V.".into()), false);
             self.overlay_hide_after(2500);
         }
     }

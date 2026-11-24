@@ -59,7 +59,7 @@ release to paste completion (`total_ms` in the history database).
 | With LLM rewrite | 847 â€“ 1235 ms |
 
 Breakdown of the slowest case (8.7 s utterance with a self-correction): ASR 532 ms, LLM 343 ms,
-paste 7 ms. whisper-server is ~2Ã— slower on the first request after a few seconds idle than
+paste 7 ms. whisper-server is ~2x slower on the first request after a few seconds idle than
 back-to-back (410â€“560 ms vs ~200 ms for the same clip), which is why in-app ASR is above the
 `bench_eval` numbers; see [D9](DECISIONS.md) for what was tried.
 

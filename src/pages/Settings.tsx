@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, RefreshCw } from "lucide-react";
 import { useApp } from "../App";
-import { Field, NumberInput, Toggle } from "../components/ui";
-import { api } from "../lib/api";
+import { Item, PageHead, Range, Section, Toggle } from "../components/ui";
+import { api, IS_MAC, keyLabel, MOD } from "../lib/api";
 
 const LLM_MODELS = [
-  { file: "Qwen3.5-4B-Q4_K_M.gguf", label: "Qwen3.5 4B — best quality (default)" },
-  { file: "Qwen3.5-2B-Q4_K_M.gguf", label: "Qwen3.5 2B — ~2× faster" },
+  { file: "Qwen3.5-4B-Q4_K_M.gguf", label: "Qwen3.5 4B, best quality" },
+  { file: "Qwen3.5-2B-Q4_K_M.gguf", label: "Qwen3.5 2B, about 2x faster" },
+];
+const LANGUAGES: [string, string][] = [
+  ["en", "English"],
+  ["auto", "Detect automatically"],
+  ["es", "Spanish"],
+  ["fr", "French"],
+  ["de", "German"],
+  ["hi", "Hindi"],
+  ["zh", "Chinese"],
+  ["ja", "Japanese"],
+  ["pt", "Portuguese"],
+  ["it", "Italian"],
 ];
 
 export default function SettingsPage() {
@@ -19,136 +31,215 @@ export default function SettingsPage() {
     api.listKeys().then(setKeys);
   }, []);
 
+  const letter = (v: string) => v.slice(-1).toUpperCase();
+
   return (
     <div className="page">
-      <h1>Settings</h1>
+      <PageHead title="Settings" />
 
-      <section className="card">
-        <h2>Hotkeys</h2>
-        <Field name="Dictation key" help="Hold to talk, tap for hands-free. The key is reserved for Voxora while it runs.">
-          <select className="input" value={s.hotkey.dictation_key} onChange={(e) => update((x) => (x.hotkey.dictation_key = e.target.value))}>
+      <Section title="Keyboard">
+        <Item name="Dictation key" help="Hold to talk, tap for hands-free. Voxora reserves this key while it runs.">
+          <select
+            className="input"
+            aria-label="Dictation key"
+            value={s.hotkey.dictation_key}
+            onChange={(e) => update((x) => (x.hotkey.dictation_key = e.target.value))}
+          >
             {keys.map((k) => (
-              <option key={k}>{k}</option>
+              <option key={k} value={k}>
+                {keyLabel(k)}
+              </option>
             ))}
           </select>
-        </Field>
-        <Field name="Hold vs. tap threshold" help="Presses shorter than this start hands-free mode.">
-          <NumberInput value={s.hotkey.hold_threshold_ms} min={120} max={600} step={10} suffix=" ms" onChange={(v) => update((x) => (x.hotkey.hold_threshold_ms = v))} />
-        </Field>
-        <Field name="Cycle mode" help="Ctrl + Alt + this key.">
-          <input className="input mono" maxLength={1} value={s.hotkey.cycle_mode_key} onChange={(e) => e.target.value && update((x) => (x.hotkey.cycle_mode_key = e.target.value.toUpperCase()))} style={{ width: 60 }} />
-        </Field>
-        <Field name="Paste last dictation" help="Ctrl + Alt + this key. Recovers text an app missed.">
-          <input className="input mono" maxLength={1} value={s.hotkey.repaste_key} onChange={(e) => e.target.value && update((x) => (x.hotkey.repaste_key = e.target.value.toUpperCase()))} style={{ width: 60 }} />
-        </Field>
-      </section>
+        </Item>
+        <Item name="Tap or hold" help="Presses shorter than this start hands-free listening.">
+          <Range
+            label="Tap or hold threshold"
+            value={s.hotkey.hold_threshold_ms}
+            min={120}
+            max={600}
+            step={10}
+            unit="ms"
+            onChange={(v) => update((x) => (x.hotkey.hold_threshold_ms = v))}
+          />
+        </Item>
+        <Item name="Switch mode" help={`${MOD.ctrl} + ${MOD.alt} + this letter`}>
+          <input
+            className="input mono"
+            aria-label="Switch mode letter"
+            maxLength={1}
+            value={s.hotkey.cycle_mode_key}
+            onChange={(e) => e.target.value && update((x) => (x.hotkey.cycle_mode_key = letter(e.target.value)))}
+            style={{ width: 56, textAlign: "center" }}
+          />
+        </Item>
+        <Item name="Paste last dictation" help={`${MOD.ctrl} + ${MOD.alt} + this letter`}>
+          <input
+            className="input mono"
+            aria-label="Paste last dictation letter"
+            maxLength={1}
+            value={s.hotkey.repaste_key}
+            onChange={(e) => e.target.value && update((x) => (x.hotkey.repaste_key = letter(e.target.value)))}
+            style={{ width: 56, textAlign: "center" }}
+          />
+        </Item>
+      </Section>
 
-      <section className="card">
-        <h2>Microphone</h2>
-        <Field name="Input device">
-          <select className="input" value={s.audio.device ?? ""} onChange={(e) => update((x) => (x.audio.device = e.target.value || null))}>
-            <option value="">Windows default</option>
+      <Section title="Microphone">
+        <Item name="Input">
+          <select
+            className="input"
+            aria-label="Microphone"
+            value={s.audio.device ?? ""}
+            onChange={(e) => update((x) => (x.audio.device = e.target.value || null))}
+          >
+            <option value="">System default</option>
             {devices.map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>
-        </Field>
-        <Field name="Hands-free stops after silence">
-          <NumberInput value={s.audio.hands_free_silence_ms} min={500} max={4000} step={100} suffix=" ms" onChange={(v) => update((x) => (x.audio.hands_free_silence_ms = v))} />
-        </Field>
-      </section>
+        </Item>
+        <Item name="Hands-free stops after" help="How long a pause ends hands-free listening.">
+          <Range
+            label="Silence before stopping"
+            value={s.audio.hands_free_silence_ms}
+            min={500}
+            max={6000}
+            step={100}
+            unit="ms"
+            onChange={(v) => update((x) => (x.audio.hands_free_silence_ms = v))}
+          />
+        </Item>
+      </Section>
 
-      <section className="card">
-        <h2>AI engines</h2>
-        <Field name="Speech language" help="“auto” detects the language per dictation (slightly slower).">
-          <select className="input" value={s.asr.language} onChange={(e) => update((x) => (x.asr.language = e.target.value))}>
-            {["en", "auto", "es", "fr", "de", "hi", "zh", "ja", "pt", "it"].map((l) => (
-              <option key={l}>{l}</option>
+      <Section title="Speech and rewriting">
+        <Item name="Language">
+          <select className="input" aria-label="Language" value={s.asr.language} onChange={(e) => update((x) => (x.asr.language = e.target.value))}>
+            {LANGUAGES.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
             ))}
           </select>
-        </Field>
-        <Field name="Use GPU for speech" help={status.gpu ?? "No NVIDIA GPU detected — CPU will be used."}>
-          <Toggle label="GPU" checked={s.asr.use_gpu} onChange={(v) => update((x) => (x.asr.use_gpu = v))} />
-        </Field>
-        <Field name="AI rewrite" help="Off = instant, rule-based cleanup only (fillers, punctuation, math, dictionary).">
+        </Item>
+        <Item name="Use the GPU" help={status.gpu ?? (IS_MAC ? "Uses Apple silicon through Metal." : "No NVIDIA GPU found, so the CPU is used.")}>
+          <Toggle label="Use the GPU" checked={s.asr.use_gpu} onChange={(v) => update((x) => (x.asr.use_gpu = v))} />
+        </Item>
+        <Item name="AI rewrite" help="When off, only the instant rule-based cleanup runs: fillers, punctuation, math and your dictionary.">
           <Toggle label="AI rewrite" checked={s.llm.enabled} onChange={(v) => update((x) => (x.llm.enabled = v))} />
-        </Field>
+        </Item>
         {s.llm.enabled && (
           <>
-            <Field name="Rewrite engine" help="Built-in runs llama.cpp locally. External = any OpenAI-compatible server (Ollama, LM Studio).">
-              <select className="input" value={s.llm.managed ? "managed" : "external"} onChange={(e) => update((x) => (x.llm.managed = e.target.value === "managed"))}>
-                <option value="managed">Built-in (recommended)</option>
+            <Item name="Rewrite engine" help="Built in runs llama.cpp on this computer. External uses any OpenAI-compatible server, such as Ollama.">
+              <select
+                className="input"
+                aria-label="Rewrite engine"
+                value={s.llm.managed ? "managed" : "external"}
+                onChange={(e) => update((x) => (x.llm.managed = e.target.value === "managed"))}
+              >
+                <option value="managed">Built in</option>
                 <option value="external">External server</option>
               </select>
-            </Field>
+            </Item>
             {s.llm.managed ? (
-              <Field name="Rewrite model" help="Switching downloads the model if needed.">
-                <select className="input" value={s.llm.model} onChange={(e) => update((x) => (x.llm.model = e.target.value))}>
+              <Item name="Model" help="Switching downloads the model if it isn't on disk yet.">
+                <select className="input" aria-label="Model" value={s.llm.model} onChange={(e) => update((x) => (x.llm.model = e.target.value))}>
                   {LLM_MODELS.map((m) => (
                     <option key={m.file} value={m.file}>
                       {m.label}
                     </option>
                   ))}
                 </select>
-              </Field>
+              </Item>
             ) : (
               <>
-                <Field name="Endpoint" help="Base URL ending in /v1, e.g. http://127.0.0.1:11434/v1 for Ollama.">
-                  <input className="input mono" defaultValue={s.llm.endpoint} onBlur={(e) => update((x) => (x.llm.endpoint = e.target.value.trim()))} />
-                </Field>
-                <Field name="Model name">
-                  <input className="input mono" defaultValue={s.llm.model} onBlur={(e) => update((x) => (x.llm.model = e.target.value.trim()))} />
-                </Field>
+                <Item name="Server address" help="Ends in /v1. Ollama uses http://127.0.0.1:11434/v1">
+                  <input
+                    className="input mono"
+                    aria-label="Server address"
+                    defaultValue={s.llm.endpoint}
+                    onBlur={(e) => update((x) => (x.llm.endpoint = e.target.value.trim()))}
+                    style={{ width: 260 }}
+                  />
+                </Item>
+                <Item name="Model name">
+                  <input
+                    className="input mono"
+                    aria-label="Model name"
+                    defaultValue={s.llm.model}
+                    onBlur={(e) => update((x) => (x.llm.model = e.target.value.trim()))}
+                    style={{ width: 260 }}
+                  />
+                </Item>
               </>
             )}
-            <Field name="Rewrite time limit" help="If the AI is slower than this, the rule-based text is inserted instead.">
-              <NumberInput value={s.llm.timeout_ms} min={800} max={8000} step={100} suffix=" ms" onChange={(v) => update((x) => (x.llm.timeout_ms = v))} />
-            </Field>
+            <Item name="Time limit" help="If the rewrite takes longer, the rule-based text is used instead.">
+              <Range
+                label="Rewrite time limit"
+                value={s.llm.timeout_ms}
+                min={800}
+                max={8000}
+                step={100}
+                unit="ms"
+                onChange={(v) => update((x) => (x.llm.timeout_ms = v))}
+              />
+            </Item>
           </>
         )}
-      </section>
+      </Section>
 
-      <section className="card">
-        <h2>Pasting &amp; privacy</h2>
-        <Field name="Restore my clipboard after pasting" help="Your copied text or image comes back once the app has read the dictation.">
-          <Toggle label="Restore clipboard" checked={s.paste.restore_clipboard} onChange={(v) => update((x) => (x.paste.restore_clipboard = v))} />
-        </Field>
-        <Field name="Restore delay" help="Raise this if a slow web app pastes your old clipboard instead.">
-          <NumberInput value={s.paste.restore_delay_ms} min={120} max={800} step={20} suffix=" ms" onChange={(v) => update((x) => (x.paste.restore_delay_ms = v))} />
-        </Field>
-        <Field name="Keep history" help="Stored only in %LOCALAPPDATA%\Voxora. Audio is never saved.">
-          <Toggle label="History" checked={s.history.enabled} onChange={(v) => update((x) => (x.history.enabled = v))} />
-        </Field>
-        <Field name="Delete history older than">
-          <NumberInput value={s.history.retention_days} min={1} max={365} suffix=" days" onChange={(v) => update((x) => (x.history.retention_days = v))} />
-        </Field>
-      </section>
+      <Section title="Clipboard and privacy">
+        <Item name="Put my clipboard back" help="Whatever you had copied returns right after the paste.">
+          <Toggle label="Put my clipboard back" checked={s.paste.restore_clipboard} onChange={(v) => update((x) => (x.paste.restore_clipboard = v))} />
+        </Item>
+        <Item name="Wait before restoring" help="Raise this if a slow web app pastes your old clipboard.">
+          <Range
+            label="Restore delay"
+            value={s.paste.restore_delay_ms}
+            min={120}
+            max={800}
+            step={20}
+            unit="ms"
+            onChange={(v) => update((x) => (x.paste.restore_delay_ms = v))}
+          />
+        </Item>
+        <Item name="Keep history" help="Text only, stored on this computer. Audio is never saved.">
+          <Toggle label="Keep history" checked={s.history.enabled} onChange={(v) => update((x) => (x.history.enabled = v))} />
+        </Item>
+        <Item name="Delete history after">
+          <Range
+            label="History retention"
+            value={s.history.retention_days}
+            min={1}
+            max={365}
+            unit="days"
+            onChange={(v) => update((x) => (x.history.retention_days = v))}
+          />
+        </Item>
+      </Section>
 
-      <section className="card">
-        <h2>General</h2>
-        <Field name="Start with Windows" help="Starts minimized to the tray.">
-          <Toggle label="Autostart" checked={s.autostart} onChange={(v) => update((x) => (x.autostart = v))} />
-        </Field>
-        <Field name="Theme">
-          <div className="seg">
+      <Section title="General">
+        <Item name={IS_MAC ? "Open at login" : "Start with Windows"} help="Starts quietly in the menu bar or tray.">
+          <Toggle label="Open at login" checked={s.autostart} onChange={(v) => update((x) => (x.autostart = v))} />
+        </Item>
+        <Item name="Appearance">
+          <div className="seg" role="radiogroup" aria-label="Appearance">
             {(["system", "light", "dark"] as const).map((t) => (
-              <button key={t} className={s.theme === t ? "on" : ""} onClick={() => update((x) => (x.theme = t))}>
-                {t[0].toUpperCase() + t.slice(1)}
+              <button key={t} role="radio" aria-checked={s.theme === t} className={s.theme === t ? "on" : ""} onClick={() => update((x) => (x.theme = t))}>
+                {t === "system" ? "Auto" : t[0].toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
-        </Field>
-        <Field name="Troubleshooting">
-          <div className="row" style={{ gap: 6 }}>
-            <button className="btn" onClick={() => api.restartEngines().then(() => toast("Restarting engines…"))}>
-              <RefreshCw size={14} /> Restart engines
-            </button>
-            <button className="btn" onClick={() => api.openFolder("logs")}>
-              <FolderOpen size={14} /> Logs
-            </button>
-          </div>
-        </Field>
-      </section>
+        </Item>
+        <Item name="Something not working?" help="Restarting the engines fixes most problems. Logs help when reporting a bug.">
+          <button className="btn" onClick={() => api.restartEngines().then(() => toast("Restarting the engines"))}>
+            <RefreshCw size={15} /> Restart
+          </button>
+          <button className="btn" onClick={() => api.openFolder("logs")}>
+            <FolderOpen size={15} /> Logs
+          </button>
+        </Item>
+      </Section>
     </div>
   );
 }

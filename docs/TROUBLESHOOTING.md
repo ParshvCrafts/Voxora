@@ -5,9 +5,9 @@ Settings → General → **Logs** opens the folder. Set `VOXORA_LOG=debug` for m
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Pill says "Copied — press Ctrl+V (admin window)" | The target app runs as Administrator. Windows (UIPI) blocks synthetic keystrokes from a normal app into an elevated one. | Press Ctrl+V yourself; the text is on the clipboard. Or run Voxora as admin too. |
+| Pill says "Admin window: press Ctrl+V to paste" | The target app runs as Administrator. Windows (UIPI) blocks synthetic keystrokes from a normal app into an elevated one. | Press Ctrl+V yourself; the text is on the clipboard. Or run Voxora as admin too. |
 | An app pastes your *old* clipboard | Some web editors read the clipboard late. | Settings → Pasting & privacy → raise **Restore delay** (e.g. 350 ms). |
-| "No microphone input — is it muted?" | The device delivers digital silence (hardware mute switch, privacy setting). | Windows Settings → Privacy → Microphone → allow desktop apps; check the mute key. |
+| "No sound from the mic. Is it muted?" | The device delivers digital silence (hardware mute switch, privacy setting). | Windows Settings → Privacy → Microphone → allow desktop apps; check the mute key. |
 | "No speech detected" | Voice activity detection heard less than 0.2 s of speech. | Speak after the pill appears; check the mic in Settings → Microphone. |
 | Speech / Rewrite status shows `error` | A server failed to start (often GPU memory used by a game or training job). | Voxora retries on CPU automatically. Free VRAM, then tray → **Restart engines**. |
 | First dictation after boot is slow | Models load into VRAM (~5–15 s) after login. | Wait for "ready" in the tray menu's status line or on the Home page. |

@@ -119,3 +119,13 @@ export const MODES: { id: Mode; label: string; badge: string; blurb: string }[] 
 ];
 
 export const modeLabel = (m: Mode) => MODES.find((x) => x.id === m)?.label ?? m;
+
+export const IS_MAC = navigator.userAgent.includes("Mac OS");
+/** Modifier names as printed on the user's keyboard. */
+export const MOD = IS_MAC ? { ctrl: "Control", alt: "Option" } : { ctrl: "Ctrl", alt: "Alt" };
+/** "RightAlt" → "Right Alt" (Windows) / "Right Option" (Mac). */
+export const keyLabel = (k: string) =>
+  k
+    .replace(/Alt/, IS_MAC ? "Option" : "Alt")
+    .replace(/Ctrl/, IS_MAC ? "Control" : "Ctrl")
+    .replace(/^(Right|Left)/, "$1 ");

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, Plus, X } from "lucide-react";
 import { useApp } from "../App";
+import { PageHead, Section } from "../components/ui";
 
 export default function Dictionary() {
   const { settings, update } = useApp();
@@ -23,70 +24,73 @@ export default function Dictionary() {
 
   return (
     <div className="page">
-      <div>
-        <h1>Dictionary</h1>
-        <p className="sub">
-          Teach Voxora your words. Terms bias the speech model toward the right spelling <em>and</em> fix casing
-          afterwards (“lang graph” → LangGraph).
-        </p>
-      </div>
-      <section className="card">
-        <h2>Vocabulary</h2>
-        <div className="row" style={{ marginBottom: 12 }}>
+      <PageHead title="Dictionary">
+        Teach Voxora the names and terms you use. It listens for them and always spells them your way.
+      </PageHead>
+
+      <Section
+        title="Vocabulary"
+        footer={'Spoken as "lang graph", typed as LangGraph. Names, libraries, acronyms and product names work best.'}
+      >
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 18 }}>
+          <div className="row">
+            <input
+              className="input"
+              placeholder="Add a word, like Kubernetes or Priya"
+              aria-label="New vocabulary word"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addTerm()}
+            />
+            <button className="btn primary" onClick={addTerm} disabled={!term.trim()}>
+              <Plus size={16} /> Add
+            </button>
+          </div>
+          <div className="chips">
+            {d.terms.map((t, i) => (
+              <span className="chip" key={t}>
+                {t}
+                <button aria-label={`Remove ${t}`} onClick={() => update((s) => s.dictionary.terms.splice(i, 1))}>
+                  <X size={14} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Shortcuts and corrections"
+        footer={'Say the phrase on the left and Voxora types the text on the right. Handy for an email address or a name it keeps mishearing.'}
+      >
+        <div className="row" style={{ padding: 20 }}>
+          <input className="input" placeholder="When I say" aria-label="When I say" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <ArrowRight size={18} className="muted" style={{ flex: "none" }} />
           <input
             className="input"
-            placeholder="Add a name, library or term (e.g. heteroscedasticity, Kubernetes, Priya)"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addTerm()}
-          />
-          <button className="btn primary" onClick={addTerm}>
-            <Plus size={15} /> Add
-          </button>
-        </div>
-        <div className="chips">
-          {d.terms.map((t, i) => (
-            <span className="chip" key={t}>
-              {t}
-              <button aria-label={`Remove ${t}`} onClick={() => update((s) => s.dictionary.terms.splice(i, 1))}>
-                <X size={13} />
-              </button>
-            </span>
-          ))}
-        </div>
-      </section>
-      <section className="card">
-        <h2>Replacements &amp; snippets</h2>
-        <p className="sub" style={{ marginTop: -6, marginBottom: 12 }}>
-          When you say the left side, Voxora types the right side. Great for misheard names or boilerplate (“my
-          email” → you@example.com).
-        </p>
-        <div className="row" style={{ marginBottom: 12 }}>
-          <input className="input" placeholder="When I say…" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <ArrowRight size={16} className="muted" style={{ flex: "none" }} />
-          <input
-            className="input"
-            placeholder="…type this"
+            placeholder="Type this"
+            aria-label="Type this"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addRep()}
           />
-          <button className="btn primary" onClick={addRep}>
-            <Plus size={15} /> Add
+          <button className="btn primary" onClick={addRep} disabled={!from.trim() || !to.trim()}>
+            <Plus size={16} /> Add
           </button>
         </div>
-        {d.replacements.length === 0 && <div className="empty">No replacements yet.</div>}
         {d.replacements.map((r, i) => (
-          <div className="row between entry" key={i}>
-            <span>
-              <span className="mono">{r.from}</span> <ArrowRight size={13} className="muted" /> <span className="mono">{r.to}</span>
-            </span>
-            <button className="btn ghost danger" aria-label="Remove" onClick={() => update((s) => s.dictionary.replacements.splice(i, 1))}>
-              <X size={14} />
+          <div className="item" key={i}>
+            <div className="row" style={{ gap: 14, minWidth: 0 }}>
+              <span>{r.from}</span>
+              <ArrowRight size={15} className="muted" style={{ flex: "none" }} />
+              <span className="mono">{r.to}</span>
+            </div>
+            <button className="btn plain icon" aria-label="Remove" onClick={() => update((s) => s.dictionary.replacements.splice(i, 1))}>
+              <X size={16} />
             </button>
           </div>
         ))}
-      </section>
+      </Section>
     </div>
   );
 }

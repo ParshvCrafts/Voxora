@@ -346,7 +346,7 @@ fn render(rows: &[Row], silence: Option<Option<String>>, runs: usize, audio: boo
             r.wer.map(|w| format!("{:.0}%", w * 100.0)).unwrap_or("-".into()),
             esc(&r.out),
             esc(&if r.raw != r.out && audio {
-                format!("ASR: {}{}", r.raw, if r.why.is_empty() { String::new() } else { format!(" — {}", r.why) })
+                format!("ASR: {}{}", r.raw, if r.why.is_empty() { String::new() } else { format!("; {}", r.why) })
             } else {
                 r.why.clone()
             }),

@@ -29,7 +29,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let st = engine.status();
     let key = s.hotkey.dictation_key.replace("Right", "Right ");
     let headline = if !st.missing.is_empty() {
-        "Setup needed — open Voxora".to_string()
+        "Setup needed. Open Voxora.".to_string()
     } else if st.paused {
         "Paused".to_string()
     } else {

@@ -2,11 +2,11 @@
 
 One line of context, the decision, the trade-off accepted. Newest last.
 
-## D1 — Name: Voxora (2026-11-23)
+## D1: Name: Voxora (2026-11-23)
 Blueprint (`docs/BLUEPRINT.md`) calls the app "VoxFlow"; the GitHub repo is `Voxora`. All code, paths and
 data dirs use **Voxora** (`%LOCALAPPDATA%\Voxora`).
 
-## D2 — Inference runs in prebuilt CUDA sidecars, not FFI (2026-11-23)
+## D2: Inference runs in prebuilt CUDA sidecars, not FFI (2026-11-23)
 **Options:** (a) `whisper-rs`/`transcribe-rs` compiled with CUDA via FFI; (b) official prebuilt
 `whisper-server.exe` + `llama-server.exe` CUDA binaries supervised as localhost child processes.
 **Decision:** (b). Verified 2026-11-23 via GitHub API: whisper.cpp `b5907` ships
@@ -16,21 +16,21 @@ data dirs use **Voxora** (`%LOCALAPPDATA%\Voxora`).
 build is plain MSVC, a crash in inference cannot take down the hotkey/clipboard process, and engines are
 swappable (any OpenAI-compatible server, e.g. Ollama, works for rewriting).
 
-## D3 — Provider-neutral rewrite client (2026-11-23)
+## D3: Provider-neutral rewrite client (2026-11-23)
 Rewrite stage talks to an OpenAI-compatible `/v1/chat/completions` endpoint with JSON-schema constrained
 output. Default: managed `llama-server` on `127.0.0.1:18080`. Ollama (`127.0.0.1:11434/v1`) works by
 config. Cloud providers stay out of core (blueprint FR-15 is P2, opt-in only).
 
-## D4 — Cargo workspace: pure `voxora-core` + Windows `src-tauri` app (2026-11-23)
+## D4: Cargo workspace: pure `voxora-core` + Windows `src-tauri` app (2026-11-23)
 All text logic (normalizer, math, invariant guard, hallucination filter, modes, prompts, context rules,
 storage, state machine) lives in `crates/voxora-core` with no Win32/Tauri deps, so it unit-tests in
 seconds and the `bench_eval` CLI reuses it. Win32 hooks, audio, clipboard, sidecars live in `src-tauri`.
 
-## D5 — Owner defaults (2026-11-23)
+## D5: Owner defaults (2026-11-23)
 Hotkey **Right Alt** (hold = push-to-talk, tap < 250 ms = hands-free toggle), ASR default
 **whisper-large-v3-turbo**, mic = **Windows default input**, **autostart on login, minimized to tray**.
 
-## D6 — Rewrite model: Qwen3.5-4B Q4_K_M default, 2B as "Fast" preset (2026-11-23)
+## D6: Rewrite model: Qwen3.5-4B Q4_K_M default, 2B as "Fast" preset (2026-11-23)
 Blueprint named Qwen2.5-3B (2024); newer Apache-2.0 Qwen3.5 (Feb 2026) GGUFs exist. Measured on the
 RTX 4060 with `bench_eval` (30 cases, synthesized speech, 3 runs): **4B: 29/30, LLM P50 357 ms / P95
 929 ms; 2B: 28/30, P50 195 ms / P95 466 ms** but 2B failed the blueprint's flagship self-correction case.
@@ -38,17 +38,17 @@ Correctness wins; 2B stays one click away. Thinking is disabled per request
 (`chat_template_kwargs.enable_thinking=false`); verified no reasoning tokens are produced.
 VRAM with whisper turbo Q8 + 4B loaded: 4.3 GB of 8 GB.
 
-## D7 — Share CUDA DLLs between runtimes (2026-11-23)
+## D7: Share CUDA DLLs between runtimes (2026-11-23)
 `cudart-llama-bin-win-cuda-12.4-x64.zip` contains exactly `cublas64_12.dll`, `cublasLt64_12.dll`,
 `cudart64_12.dll`, which the whisper.cpp CUDA zip already ships. Setup hard-links them into the llama
 runtime instead of downloading 391 MB again. Each server keeps its own folder because their
 `ggml*.dll` builds differ.
 
-## D8 — Whisper vocabulary prompt on by default (2026-11-23)
+## D8: Whisper vocabulary prompt on by default (2026-11-23)
 Without a prompt Whisper heard "FAISS dense" as "phaistense"; with `Glossary: …, FAISS, BM25.` it was
 exact. Warm latency unchanged (~200 ms for 8.8 s audio).
 
-## D9 — No speculative GPU keep-warm (2026-11-23)
+## D9: No speculative GPU keep-warm (2026-11-23)
 whisper-server is ~2x slower on the first request after a few seconds idle (8.8 s clip: 410-560 ms
 cold vs ~200 ms warm). Tried: a 1-token llama-server request at key-down, then every 0.9 s while
 recording. Measured with curl: cold 562 ms → 499 ms after pings, 314 ms when overlapping; not a
@@ -56,13 +56,13 @@ reliable win, and it adds GPU work per dictation. Removed. End-to-end latency (k
 inserted, release build, 7 runs) is 0.45-0.77 s without the LLM and 0.85-1.24 s with it, inside the
 blueprint's < 1.1 s P50 target. Next idea if needed: send partial audio to whisper while recording.
 
-## D10 — E2E harness must never paste outside its own window (2026-11-23)
+## D10: E2E harness must never paste outside its own window (2026-11-23)
 Voxora pastes into whatever window has focus. Two early harness runs lost foreground to the
 developer's editor and pasted test sentences there. `scripts/e2e.ps1` now acquires focus with
 `AttachThreadInput`, verifies it before every key release, and on loss presses Esc (cancel) before
 releasing the key. Run it only when nobody is using the machine.
 
-## D11 — v0.2 scope from owner feedback (2026-11-24)
+## D11: v0.2 scope from owner feedback (2026-11-24)
 - Redesign to a calm, Apple-like look: monochrome logo (white tile, black bars), medium/large type,
   generous spacing. No em dashes anywhere in UI copy or docs (dictated output may contain them).
 - macOS support, Apple Silicon first. No Mac available: validated on GitHub macOS runners only and
