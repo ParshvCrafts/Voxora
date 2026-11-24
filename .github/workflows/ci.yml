@@ -32,7 +32,7 @@ jobs:
   macos:
     # Apple silicon. No Mac was available during development, so this job is the macOS proof:
     # it compiles, lints and tests on macOS, bundles the .dmg, and smoke-tests the real binaries.
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       WHISPER_TAG: b5907
       LLAMA_TAG: b12649
