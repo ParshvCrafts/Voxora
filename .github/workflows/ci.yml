@@ -51,9 +51,9 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
 
-      - name: Cache whisper-server
+      - name: Restore whisper-server
         id: whisper-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: src-tauri/binaries/whisper-server-aarch64-apple-darwin
           key: whisper-server-${{ env.WHISPER_TAG }}-macos-arm64-v1
@@ -69,6 +69,13 @@ jobs:
           mkdir -p src-tauri/binaries
           cp /tmp/wb/bin/whisper-server src-tauri/binaries/whisper-server-aarch64-apple-darwin
           codesign --force -s - src-tauri/binaries/whisper-server-aarch64-apple-darwin
+      - name: Save whisper-server
+        # Saved right away so a later failing step doesn't throw away a 5-minute build.
+        if: steps.whisper-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: src-tauri/binaries/whisper-server-aarch64-apple-darwin
+          key: ${{ steps.whisper-cache.outputs.cache-primary-key }}
       - name: whisper-server links only system libraries
         run: |
           otool -L src-tauri/binaries/whisper-server-aarch64-apple-darwin

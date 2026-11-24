@@ -37,6 +37,38 @@ cargo run --release --bin bench_eval -- --audio bench/audio --runs 3 --out bench
 cargo run --release --bin bench_eval -- --no-llm      # text stages only, no servers for the LLM
 ```
 
+### Golden set: 20 hard cases (`bench/golden.json`)
+
+Twenty edge cases chosen to break dictation tools: spoken URLs and Windows paths, CLI flags,
+nested LaTeX, Unicode math, self-corrections, "scratch that", quoted speech, ordinal lists,
+negation, currency and scientific notation, Big-O, model names, possessives, accented names,
+a 3.5 s mid-sentence pause, and 4 s of keyboard noise. Each case has an ideal output, scored two
+ways: **key facts** (the words, numbers and symbols that must or must not appear) and **exact
+match** with the ideal string (whitespace-insensitive).
+
+| Input | Key facts | Exact match | Report |
+|---|---|---|---|
+| Reference text (tests Voxora's own pipeline, ASR bypassed) | **19/19** | **16/19** | [golden-text.md](../bench/results/golden-text.md) |
+| Synthesized speech through Whisper (Windows SAPI voices) | 11/20 | 7/19 | [golden-audio.md](../bench/results/golden-audio.md) |
+
+The gap between the two rows is speech recognition, not the pipeline: the robotic SAPI voices
+make Whisper hear "Reedy's cache" for Redis, "SHAD256" for SHA-256 and "RTX 4068GB" for
+"RTX 4060 8GB", and the voice itself reads `1e-4` aloud as "1 times 10 to the power of negative
+fourth". The text row shows what Voxora does with a correct transcript. Remaining exact-match
+misses with reference text: `\log(\hat{y}_i)` keeps parentheses (valid LaTeX, different
+spelling than the ideal), a pause with no transcript punctuation gets no dash, and
+"Qwen 2.5 3B Instruct" is not joined into a model ID. Noise-only audio inserts nothing.
+
+Owner decisions applied to the targets (D11): Voxora types what you said and never acts on
+instructions inside the dictation, so "Send a Slack message saying ..." keeps its first words
+and "scratch that" drops only the retracted sentence.
+
+```powershell
+powershell -File scripts/gen-bench-audio.ps1 -Cases bench/golden.json
+cargo run --release --bin bench_eval -- --cases bench/golden.json --runs 3                     # text
+cargo run --release --bin bench_eval -- --cases bench/golden.json --audio bench/audio --runs 3  # speech
+```
+
 ## 2. End-to-end in the real app (`scripts/e2e.ps1`)
 
 The release build is driven through its real code path: a scripted Right Alt press goes through

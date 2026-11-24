@@ -20,3 +20,15 @@ Settings → General → **Logs** opens the folder. Set `VOXORA_LOG=debug` for m
 Every dictation is saved to `%LOCALAPPDATA%\Voxora\voxora.db` *before* it is pasted. If a paste
 was missed: **Ctrl+Alt+V** pastes the last dictation, or open **History** and click Copy.
 If transcription itself failed, tray → **Retry failed recording** re-runs the audio (kept in RAM only).
+
+## macOS (beta)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "Voxora can't be opened because Apple cannot check it" | The app is ad-hoc signed, not notarized (notarization needs a paid Apple account). | Open it once, close the dialog, then System Settings > Privacy & Security > scroll down > **Open Anyway**. Or in Terminal: `xattr -dr com.apple.quarantine /Applications/Voxora.app` |
+| Banner "One permission to go", or the key does nothing | Voxora needs Accessibility to hear the dictation key and to press Command+V for you. | Click **Open System Settings** in the banner and turn Voxora on under Accessibility. The banner disappears within two seconds. |
+| Accessibility switch is on but the key still does nothing after an update | macOS ties the permission to the exact build, and each update is a new build. | In Accessibility, select Voxora, click the minus button, then add it again (or run `tccutil reset Accessibility dev.voxora.app`). |
+| Pill says "Secure input is on: press Command+V" | A password field, or a terminal with Secure Keyboard Entry enabled, blocks synthetic keystrokes. | Press Command+V yourself. In Terminal or iTerm2, turn off Secure Keyboard Entry in the app menu if you want automatic pasting. |
+| No sound from the mic | Microphone permission was denied on first use. | System Settings > Privacy & Security > Microphone > turn on Voxora. |
+| Esc or the dictation key also reaches the app | By design on macOS: Voxora only listens to the keyboard, it never blocks keys. | Nothing to fix. Right Option on its own types nothing. |
+| App rules based on a window title don't apply | Reading other apps' window titles needs Screen Recording permission, which Voxora never asks for. | Use app-name rules (for example `Code`, `Terminal`, `Mail`). |

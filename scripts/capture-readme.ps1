@@ -45,7 +45,7 @@ Shot ($r.L + 7) $r.T ($r.R - $r.L - 14) ($r.B - $r.T - 7) "home.png"
 
 # 2. Overlay pill over a neutral backdrop.
 $wa = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$bg = New-Object Windows.Forms.Form -Property @{ FormBorderStyle = "None"; BackColor = [Drawing.Color]::FromArgb(30, 32, 44); TopMost = $false; ShowInTaskbar = $false; StartPosition = "Manual" }
+$bg = New-Object Windows.Forms.Form -Property @{ FormBorderStyle = "None"; BackColor = [Drawing.Color]::FromArgb(245, 245, 247); TopMost = $false; ShowInTaskbar = $false; StartPosition = "Manual" }
 $bg.Bounds = New-Object Drawing.Rectangle ($wa.X + $wa.Width / 2 - 400), ($wa.Bottom - 260), 800, 260
 $bg.Show(); [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 300
 [C]::keybd_event(0xA5, 0, 1, [UIntPtr]::Zero)

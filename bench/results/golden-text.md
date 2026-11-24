@@ -7,9 +7,9 @@
 
 | Stage | P50 | P95 | n |
 |---|---|---|---|
-| Rewrite via LLM | 350 ms | 633 ms | 12 |
-| Rewrite fast path | 0 ms | 445 ms | 45 |
-| ASR + rewrite | 0 ms | 540 ms | 57 |
+| Rewrite via LLM | 362 ms | 638 ms | 12 |
+| Rewrite fast path | 0 ms | 443 ms | 45 |
+| ASR + rewrite | 0 ms | 631 ms | 57 |
 
 ## Cases
 

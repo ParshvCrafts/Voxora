@@ -1,5 +1,5 @@
 """Compose docs/assets/social-preview.png (1280x640) from the real app icon and the captured
-overlay pill (docs/assets/overlay.png). Run after scripts/capture-readme.ps1."""
+HUD pill (docs/assets/overlay.png). Run after scripts/capture-readme.ps1."""
 
 from pathlib import Path
 
@@ -8,36 +8,37 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 W, H = 1280, 640
 FONTS = Path("C:/Windows/Fonts")
+INK, GRAY, LIGHT = (29, 29, 31), (110, 110, 115), (245, 245, 247)
 
-img = Image.new("RGB", (W, H), (13, 14, 20))
-# Soft indigo/cyan glows instead of hard edges.
-glow = Image.new("RGB", (W, H), (0, 0, 0))
-d = ImageDraw.Draw(glow)
-d.ellipse((-200, -260, 620, 420), fill=(60, 62, 170))
-d.ellipse((820, 300, 1500, 900), fill=(8, 110, 140))
-img = Image.blend(img, glow.filter(ImageFilter.GaussianBlur(160)), 0.55)
+img = Image.new("RGB", (W, H), LIGHT)
+# One soft white highlight behind the content, no hard edges.
+glow = Image.new("L", (W, H), 0)
+ImageDraw.Draw(glow).ellipse((-160, -220, 900, 700), fill=255)
+img.paste(Image.new("RGB", (W, H), (255, 255, 255)), (0, 0), glow.filter(ImageFilter.GaussianBlur(140)))
 
-icon = Image.open(ROOT / "src-tauri/icons/128x128@2x.png").convert("RGBA").resize((132, 132), Image.LANCZOS)
-img.paste(icon, (96, 112), icon)
+icon = Image.open(ROOT / "src-tauri/icons/128x128@2x.png").convert("RGBA").resize((150, 150), Image.LANCZOS)
+shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+ImageDraw.Draw(shadow).rounded_rectangle((104, 122, 236, 254), radius=32, fill=(0, 0, 0, 40))
+img.paste(shadow.filter(ImageFilter.GaussianBlur(14)), (0, 0), shadow.filter(ImageFilter.GaussianBlur(14)))
+img.paste(icon, (94, 108), icon)
 
 draw = ImageDraw.Draw(img)
-title = ImageFont.truetype(str(FONTS / "segoeuib.ttf"), 92)
-body = ImageFont.truetype(str(FONTS / "segoeui.ttf"), 34)
-small = ImageFont.truetype(str(FONTS / "segoeui.ttf"), 26)
-draw.text((256, 118), "Voxora", font=title, fill=(240, 242, 250))
-draw.text((98, 290), "Hold a key, speak, release: clean text in any Windows app.", font=body, fill=(214, 218, 232))
-draw.text((98, 340), "Whisper + a local LLM on your GPU. No account, no cloud.", font=body, fill=(160, 166, 190))
+title = ImageFont.truetype(str(FONTS / "segoeuib.ttf"), 96)
+body = ImageFont.truetype(str(FONTS / "segoeui.ttf"), 36)
+small = ImageFont.truetype(str(FONTS / "segoeui.ttf"), 27)
+draw.text((272, 120), "Voxora", font=title, fill=INK)
+draw.text((100, 300), "Hold a key, speak, let go. Clean text in any app.", font=body, fill=INK)
+draw.text((100, 352), "Whisper and a local LLM on your own machine. No account, no cloud.", font=body, fill=GRAY)
 
 pill = Image.open(ROOT / "docs/assets/overlay.png").convert("RGB")
-# Crop the backdrop to the pill, then feather it onto the card.
 pw, ph = pill.size
-pill = pill.crop((int(pw * 0.2), int(ph * 0.22), int(pw * 0.8), int(ph * 0.78)))
-pill = pill.resize((int(pill.width * 1.35), int(pill.height * 1.35)), Image.LANCZOS)
+pill = pill.crop((int(pw * 0.18), int(ph * 0.2), int(pw * 0.82), int(ph * 0.8)))
+pill = pill.resize((int(pill.width * 1.3), int(pill.height * 1.3)), Image.LANCZOS)
 mask = Image.new("L", pill.size, 0)
-ImageDraw.Draw(mask).rounded_rectangle((6, 6, pill.width - 6, pill.height - 6), radius=pill.height // 2, fill=255)
-img.paste(pill, (98, 440), mask.filter(ImageFilter.GaussianBlur(3)))
-draw.text((98 + pill.width + 30, 440 + pill.height // 2 - 16), "Rust · Tauri · whisper.cpp · llama.cpp · MIT",
-          font=small, fill=(140, 146, 170))
+ImageDraw.Draw(mask).rounded_rectangle((4, 4, pill.width - 4, pill.height - 4), radius=pill.height // 2, fill=255)
+img.paste(pill, (96, 452), mask.filter(ImageFilter.GaussianBlur(2)))
+draw.text((96 + pill.width + 34, 452 + pill.height // 2 - 17), "Windows  ·  macOS beta  ·  open source, MIT",
+          font=small, fill=GRAY)
 
 out = ROOT / "docs/assets/social-preview.png"
 img.save(out, optimize=True)

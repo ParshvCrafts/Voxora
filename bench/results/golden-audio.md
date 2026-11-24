@@ -9,10 +9,10 @@
 
 | Stage | P50 | P95 | n |
 |---|---|---|---|
-| ASR (whisper-server) | 203 ms | 255 ms | 60 |
-| Rewrite via LLM | 362 ms | 838 ms | 12 |
+| ASR (whisper-server) | 208 ms | 271 ms | 60 |
+| Rewrite via LLM | 353 ms | 837 ms | 12 |
 | Rewrite fast path | 0 ms | 0 ms | 48 |
-| ASR + rewrite | 207 ms | 758 ms | 60 |
+| ASR + rewrite | 213 ms | 847 ms | 60 |
 
 ## Cases
 
@@ -20,8 +20,8 @@
 |---|---|---|---|---|---|---|
 | ✅ | = | `g01` self_correction | llm | 20% | Let's push the release to Friday at 11:30 AM PST. | ASR: Let's push the release to Thursday at 3pm, actually no, sorry, make that Friday at 11:30am PST. |
 | ✅ | ≠ | `g02` disfluency | llm | 0% | I was thinking we should refactor the auth middleware before we ship V2. | ASR: Um, so basically I was thinking, uh, like maybe we should, you know, refactor the auth middleware before we, uh, ship V2. |
-| ❌ | ≠ | `g03` identifiers | fast | 52% | Run ptest-dash-max-fail=1 on test_user_auth.py and check getUserById. | ASR: Run ptest-dash-max-fail=1 on test_user_auth.py and check camel case get user by id. — missing "--maxfail=1" |
-| ❌ | ≠ | `g04` latex | fast | 8% | Write the loss function as $-\frac{1}{n} \sum_{i=1}^{n} y_i \log(\hat{y}_i)$. | ASR: Write the loss function as -1 over n times sigma from i equals 1 to n of y sub i log y hat sub i. — missing "\\frac{1}{N}" |
+| ❌ | ≠ | `g03` identifiers | fast | 52% | Run ptest-dash-max-fail=1 on test_user_auth.py and check getUserById. | ASR: Run ptest-dash-max-fail=1 on test_user_auth.py and check camel case get user by id.; missing "--maxfail=1" |
+| ❌ | ≠ | `g04` latex | fast | 8% | Write the loss function as $-\frac{1}{n} \sum_{i=1}^{n} y_i \log(\hat{y}_i)$. | ASR: Write the loss function as -1 over n times sigma from i equals 1 to n of y sub i log y hat sub i.; missing "\\frac{1}{N}" |
 | ✅ | = | `g05` unicode_math | fast | 0% | In technical mode, verify that θᵀx + b ≥ 0 and α = 0.001. | ASR: In technical mode, verify that theta transpose X plus B is greater than or equal to zero and alpha equals 0.001. |
 | ✅ | = | `g06` homophones | fast | 0% | Ensure the kernel serializes the byte array into the Redis cache before their worker thread writes there. |  |
 | ✅ | = | `g07` spoken_punctuation | fast | 0% | Send a Slack message saying we need a full stop on new features until the period ends. | ASR: Send a Slack message saying we need a full stop on new features until the period ends, period. |
@@ -32,7 +32,7 @@
 | ❌ | ≠ | `g12` ml_jargon +dict | fast | 0% | Combine FashionCLIP dense embeddings in FAISS with sparse BM25 scores using reciprocal rank fusion. | missing "Reciprocal Rank Fusion" |
 | ❌ | ≠ | `g13` long_pause | fast | 25% | The primary bottleneck isn't CPU throughput, it's PCIe host to device memory transfer latency. | missing "host-to-device" |
 | ✅ |  | `g14` noise_only | fast | - |  |  |
-| ❌ | ≠ | `g15` quotes | fast | 22% | Reply to Dr. Patel saying, "RR squared reached 0.841 with P < 0.001", and attach the CSV. | ASR: Reply to Dr. Patel saying, "RR squared reached 0.841 with P less than 0.001", and attach the CSV. — missing "\"Our R" |
+| ❌ | ≠ | `g15` quotes | fast | 22% | Reply to Dr. Patel saying, "RR squared reached 0.841 with P < 0.001", and attach the CSV. | ASR: Reply to Dr. Patel saying, "RR squared reached 0.841 with P less than 0.001", and attach the CSV.; missing "\"Our R" |
 | ❌ | ≠ | `g16` model_strings | fast | 50% | Benchmark QEN 2.53B Instruct Q4_K_M on an i9-14900HX with an RTX 4068GB GPU. | missing "RTX 4060" |
 | ✅ | = | `g17` possessives | fast | 0% | AWS's IAM policy blocked Lambda's access because it's missing its execution role. |  |
 | ✅ | = | `g18` scratch_that | llm | 10% | Tell them the migration is paused pending QA sign-off. | ASR: Tell the team the migration is complete, scratch that whole sentence, tell them the migration is paused pending QA sign off. |

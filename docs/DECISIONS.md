@@ -72,3 +72,13 @@ releasing the key. Run it only when nobody is using the machine.
   punctuation. It never acts on instructions inside the dictation ("send a message saying X"
   stays as said).
 - Golden set of 20 hard cases (bench/golden.json) added next to the 30 existing bench cases.
+
+## D12: Golden edge cases handled by rules first, LLM decoding made greedy (2026-11-24)
+The 20-case golden set started at 11/19 key facts with reference text. Most misses were spoken
+syntax the LLM could not be trusted to rebuild (URLs, paths, flags, "quote ... end quote",
+Big-O, ordinal lists), so they became deterministic rules in `normalize.rs`, each with a test.
+Result: 19/19 key facts, 16/19 exact. The LLM sampled at temperature 0.1 gave different words
+between runs ("ship v2" vs "shipping v2"); temperature 0 made two consecutive runs identical
+with no quality loss on either benchmark (30/30 and 19/19). Spoken symbol joining is
+Technical-mode only and needs a strong joiner (slash, backslash, underscore, or a dot before a
+known extension/TLD), so prose like "the red dot" is never glued together.
