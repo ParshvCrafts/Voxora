@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Voxora",
-  "version": "0.1.0",
-  "identifier": "dev.voxora.app",
+  "version": "0.2.0",
+  "identifier": "dev.voxora.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",

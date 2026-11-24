@@ -1,0 +1,89 @@
+name: Release
+# Push a tag like v0.2.0 to build both installers. The result is a DRAFT release: nothing is
+# public until someone reviews it and clicks Publish on GitHub.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/msi/*.msi
+
+  macos:
+    runs-on: macos-15
+    env:
+      WHISPER_TAG: b5907
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Restore whisper-server
+        id: whisper-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: src-tauri/binaries/whisper-server-aarch64-apple-darwin
+          key: whisper-server-${{ env.WHISPER_TAG }}-macos-arm64-v1
+      - name: Build whisper-server from source (Metal, static)
+        if: steps.whisper-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$WHISPER_TAG" https://github.com/ggml-org/whisper.cpp /tmp/whisper.cpp
+          cmake -S /tmp/whisper.cpp -B /tmp/wb -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_NATIVE=OFF \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DWHISPER_BUILD_SERVER=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON
+          cmake --build /tmp/wb --config Release -j 4 --target whisper-server
+          mkdir -p src-tauri/binaries
+          cp /tmp/wb/bin/whisper-server src-tauri/binaries/whisper-server-aarch64-apple-darwin
+          codesign --force -s - src-tauri/binaries/whisper-server-aarch64-apple-darwin
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri build --bundles app,dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: target/release/bundle/dmg/*.dmg
+
+  draft:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Create draft release with checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          find . -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \) -exec mv {} . \;
+          sha256sum *.exe *.msi *.dmg > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --generate-notes \
+            --title "Voxora $GITHUB_REF_NAME" *.exe *.msi *.dmg SHA256SUMS.txt

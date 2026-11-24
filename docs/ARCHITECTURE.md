@@ -6,10 +6,10 @@ deterministic text pipeline around them. Decisions and their evidence live in
 
 ```mermaid
 flowchart LR
-  K[Keyboard hook<br/>WH_KEYBOARD_LL] --> G[Gesture state machine<br/>hold = PTT, tap = hands-free]
-  G --> A[Mic capture<br/>cpal / WASAPI]
+  K[Key listener<br/>WH_KEYBOARD_LL / CGEventTap] --> G[Gesture state machine<br/>hold = PTT, tap = hands-free]
+  G --> A[Mic capture<br/>cpal: WASAPI / CoreAudio]
   A -- 16 kHz frames --> V[earshot VAD<br/>level meter, auto-stop]
-  A -- full clip, FFT resample --> W[whisper-server<br/>large-v3-turbo, CUDA]
+  A -- full clip, FFT resample --> W[whisper-server<br/>large-v3-turbo, CUDA / Metal]
   W --> F[Hallucination filter]
   F --> DB[(SQLite WAL<br/>raw text saved)]
   DB --> N[Stage 1: normalizer<br/>fillers, dictionary, math, identifiers]
@@ -26,8 +26,23 @@ flowchart LR
 | Path | Role | Platform |
 |---|---|---|
 | `crates/voxora-core` | Normalizer, spoken-math parser, invariant guard, ASR filter, prompts, pipeline, gesture state machine, app-context rules, settings, SQLite store, whisper/LLM clients, sidecar supervisor, verified downloader, `bench_eval` | Any (no Win32) |
-| `src-tauri` | Keyboard hook, mic capture + VAD, foreground-window + UIPI detection, clipboard injection, overlay window styles, job object, tray, IPC commands, orchestrator (`engine.rs`) | Windows |
-| `src/` | React UI: settings/history window and the overlay pill | WebView2 |
+| `src-tauri` | Mic capture + VAD, tray, IPC commands, orchestrator (`engine.rs`), plus four OS modules: `hotkey`, `inject`, `target`, `winutil` | Windows, macOS |
+| `src-tauri/src/mac/` | macOS versions of the four OS modules, selected with `#[cfg_attr(target_os = "macos", path = ...)]` | macOS |
+| `src/` | React UI: main window and the HUD | WebView2 / WKWebView |
+
+## Platforms
+
+| Concern | Windows | macOS |
+|---|---|---|
+| Dictation key | `WH_KEYBOARD_LL` hook; swallows the key | Listen-only `CGEventTap` (never blocks keys) |
+| Paste | Clipboard + `SendInput` Ctrl+V | `NSPasteboard` + `CGEvent` Command+V |
+| Clipboard history opt-out | `ExcludeClipboardContentFromMonitorProcessing` etc. | `org.nspasteboard.TransientType` etc. |
+| "Can't paste here" | Elevated target (UIPI) | Secure Keyboard Entry on |
+| Foreground app | Process name + window title | App name only (titles need Screen Recording) |
+| HUD | `WS_EX_NOACTIVATE`, click-through | `orderFrontRegardless`, ignores mouse, all Spaces |
+| Child servers | Kill-on-close job object | PID file, orphans stopped on next launch |
+| whisper-server | Official CUDA/CPU zip, downloaded | Built from source in CI, bundled in `Voxora.app` |
+| Permissions | None | Accessibility (key + paste), Microphone |
 
 ## Lifecycle (src-tauri/src/engine.rs)
 

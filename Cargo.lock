@@ -5257,7 +5257,7 @@ dependencies = [
 
 [[package]]
 name = "voxora"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "core-foundation",
  "core-graphics",
@@ -5283,7 +5283,7 @@ dependencies = [
 
 [[package]]
 name = "voxora-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aho-corasick",
  "flate2",

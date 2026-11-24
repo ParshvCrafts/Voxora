@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="assets/logo.svg" width="88" alt="Voxora logo: five white bars forming a V-shaped waveform on an indigo-to-cyan square">
+  <img src="assets/logo.svg" width="96" alt="Voxora logo: five black bars forming a symmetric waveform on a white rounded square">
 </p>
 
 <h1 align="center">Voxora</h1>
 
 <p align="center">
-  Hold a key, speak, release: clean text appears in any Windows app.<br>
-  Speech recognition and AI cleanup run on your own GPU. No account, no subscription, no audio leaves the PC.
+  Hold a key, speak, let go. Clean text appears in whatever app you're typing in.<br>
+  Speech recognition and AI cleanup run on your own computer. No account, no subscription, no audio leaves your machine.
 </p>
 
 <p align="center">
   <a href="https://github.com/ParshvCrafts/Voxora/actions/workflows/ci.yml"><img src="https://github.com/ParshvCrafts/Voxora/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4" alt="Windows 10/11">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20beta-555" alt="Windows and macOS (beta)">
 </p>
 
 <p align="center">
-  <img src="docs/assets/overlay.png" width="420" alt="The Voxora pill at the bottom of the screen while listening: a pulsing dot, a live 14-bar audio meter, and a TECH mode badge">
+  <img src="docs/assets/overlay.png" width="420" alt="The Voxora HUD while listening: a black capsule with a red recording dot, white live audio bars, and the active mode, Technical">
 </p>
 
 Voxora is a local-first alternative to cloud dictation tools like Wispr Flow. It is built for
@@ -27,137 +27,175 @@ into `\sum_{i=1}^{n} x_i`.
 
 ## What it does
 
-- **One key, two gestures.** Hold Right Alt to talk; tap it for hands-free mode, which stops
-  when you pause. `Esc` cancels. The floating pill never steals focus from your editor.
-- **Context-aware modes.** Clean, Technical, Math/LaTeX, Concise, Professional, Verbatim. The
-  mode follows the foreground app (VS Code/Cursor → Technical, Overleaf → Math, Gmail →
-  Professional) using only the process name and window title.
-- **Spoken math and code.** A deterministic parser renders math as Unicode (`θᵀx + b = 0`) or
-  LaTeX (`\frac{df}{dx}`, `P(Y = 1 \mid X)`); "camel case get user by id" becomes `getUserById`.
-- **AI cleanup that cannot change your facts.** A local LLM removes fillers and resolves
-  self-corrections, then an invariant guard rejects any rewrite that adds or drops a number
-  or identifier, introduces a name you never said, or answers your question instead of
-  transcribing it. Rejected rewrites
-  fall back to the rule-based text.
-- **Nothing gets lost.** Every transcript is committed to SQLite before it is pasted. Your
-  clipboard (text or image) is restored after the paste. Admin windows that block synthetic
-  input get the text on the clipboard with a notice instead of a silent failure.
-- **Personal dictionary.** Terms bias Whisper toward your spellings and fix casing afterwards
-  ("lang graph" → LangGraph); replacements double as snippets.
+- **One key, two gestures.** Hold Right Alt (Right Option on a Mac) to talk; tap it to keep
+  listening hands-free until you pause. `Esc` cancels. The floating HUD never takes focus away
+  from the app you're typing in.
+- **Modes that follow the app.** Clean, Technical, Math/LaTeX, Concise, Professional,
+  Verbatim. VS Code and Cursor switch to Technical, Overleaf to Math, Mail and Outlook to
+  Professional, using only the app's name (and, on Windows, its window title).
+- **Spoken code, paths and math.** "dash dash maxfail equals 1" becomes `--maxfail=1`;
+  "https colon slash slash api dot example dot com" becomes a URL; "O of V plus E log V" becomes
+  `O(V + E log V)`; spoken math renders as Unicode (`θᵀx + b ≥ 0`) or LaTeX
+  (`-\frac{1}{N} \sum_{i=1}^{N} y_i`).
+- **Spoken editing.** "scratch that", "quote ... end quote", "new line", a final "period", and
+  "first, ... second, ..." turning into a numbered list.
+- **AI cleanup that can't change your facts.** A local LLM removes fillers and resolves
+  self-corrections, then an invariant guard rejects any rewrite that adds or drops a number or
+  identifier, introduces a name you never said, or answers your question instead of
+  transcribing it. Rejected rewrites fall back to the rule-based text.
+- **Nothing gets lost.** Every transcript is saved to SQLite before it is pasted. Your clipboard
+  (text or image) comes back after the paste. If the target blocks synthetic keystrokes (admin
+  windows on Windows, Secure Keyboard Entry on macOS), the text waits on the clipboard and the
+  HUD tells you.
+- **Your vocabulary.** Words you add steer Whisper toward your spelling and fix casing afterwards
+  ("lang graph" becomes LangGraph); phrase shortcuts expand into longer text.
 
 <p align="center">
-  <img src="docs/assets/home.png" width="760" alt="Voxora settings window, Home page: hotkey hint, engine status pills showing Speech ready and Rewrite ready with the GPU name, usage stats, and the default-mode selector">
+  <img src="docs/assets/home.png" width="760" alt="Voxora's main window in dark mode: a sidebar with Home, History, Dictionary, Modes and Apps, Settings; the Home page reads Hold Right Alt and speak, shows Speech ready and Rewrite ready with the GPU and its memory, usage stats, and a mode selector">
 </p>
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  K[Key hook] --> M[Mic + VAD]
-  M --> W[whisper-server<br/>large-v3-turbo, CUDA]
+  K[Key listener] --> M[Mic + VAD]
+  M --> W[whisper-server<br/>large-v3-turbo<br/>CUDA or Metal]
   W --> S[(SQLite<br/>saved first)]
-  S --> N[Rules: fillers, dictionary,<br/>math, identifiers]
+  S --> N[Rules: fillers, dictionary,<br/>paths, math, identifiers]
   N --> L[llama-server<br/>Qwen3.5-4B]
   L --> G{Invariant guard}
   G -- pass --> P[Paste + restore clipboard]
   G -- fail / timeout --> P2[Paste rule-based text]
 ```
 
-- **Rust + Tauri 2** shell (4.5 MB installer, ~55 MB RAM) with a Win32 low-level keyboard hook,
-  WASAPI capture via `cpal`, the pure-Rust [earshot](https://crates.io/crates/earshot) VAD for
-  live endpointing, and clipboard/`SendInput` injection.
-- **Inference runs in official prebuilt CUDA servers** from whisper.cpp and llama.cpp, started
-  and supervised by Voxora on `127.0.0.1`. No CUDA toolkit needed to build, a crash in inference
-  cannot take down the hotkey process, and any OpenAI-compatible server (Ollama, LM Studio) can
-  replace the built-in rewrite engine.
-- **The LLM is optional by design.** Short, fluent utterances skip it (the rules already produce
-  final text in under 1 ms); a timeout or guard violation also falls back to the rules.
-- **Measured, not assumed.** Every default (model choice, vocabulary prompt, fast path) has a
-  benchmark behind it in the decision log, including ideas that were tried and dropped.
+- **Rust + Tauri 2.** One engine, with four small OS modules swapped per platform: keyboard
+  listener (Win32 low-level hook / macOS CGEventTap), paste (SendInput / CGEvent with
+  NSPasteboard), foreground app, and the non-activating HUD window. Audio goes through `cpal`
+  (WASAPI / CoreAudio), with the pure-Rust [earshot](https://crates.io/crates/earshot) VAD.
+- **Inference runs in whisper.cpp and llama.cpp servers** that Voxora starts and supervises on
+  `127.0.0.1`. Windows uses the official CUDA builds. On macOS, llama.cpp's official Metal build
+  is downloaded, and `whisper-server` (which has no official macOS binary) is compiled from a
+  pinned tag in CI and shipped inside `Voxora.app`. Any OpenAI-compatible server (Ollama, LM
+  Studio) can replace the built-in rewrite engine.
+- **The LLM is optional by design.** Short, fluent speech skips it (the rules finish in under a
+  millisecond), and a timeout or guard rejection also falls back to the rules. Decoding is greedy,
+  so the same words give the same text every time.
+- **Measured, not assumed.** Every default has a benchmark behind it in the
+  [decision log](docs/DECISIONS.md), including ideas that were tried and dropped.
 
-Deeper dive: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · decision log with evidence:
-[docs/DECISIONS.md](docs/DECISIONS.md).
+More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Results
 
 Measured on a Lenovo Legion 5i (i9-14900HX, RTX 4060 Laptop 8 GB, Windows 11). Full tables and
-how to reproduce: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+how to reproduce them: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 | | Result |
 |---|---|
-| Quality benchmark (30 cases: fillers, self-corrections, ML jargon, code, math, prompt injection; synthesized speech) | **29/30 pass** |
-| Speech recognition, warm (whisper large-v3-turbo Q8) | P50 166 ms, P95 245 ms |
-| AI rewrite when used (Qwen3.5-4B Q4_K_M) | P50 357 ms, P95 929 ms |
-| End-to-end, key release → text in app (real app, release build, 7 dictations) | 0.45–0.77 s rule-based, 0.85–1.24 s with AI rewrite |
-| 5 s of silence | nothing inserted |
+| Core benchmark (30 cases: fillers, self-corrections, ML jargon, code, math, prompt injection), synthesized speech | **29/30 pass** |
+| Golden set, 20 hard edge cases (URLs, paths, nested LaTeX, quotes, lists, Big-O, accented names, noise), Voxora's pipeline on reference text | **19/19 key facts, 16/19 exact** |
+| Same golden set through Whisper with robotic Windows TTS voices | 11/20 key facts (misses are mishearings like "Reedy's cache" for Redis) |
+| Speech recognition, warm (whisper large-v3-turbo Q8) | P50 ~200 ms, P95 ~260 ms |
+| AI rewrite when used (Qwen3.5-4B Q4_K_M) | P50 ~360 ms, P95 ~840 ms |
+| End-to-end, key release to text in the app (real app, release build) | 0.45 to 0.77 s rule-based, 0.85 to 1.24 s with AI rewrite |
+| Silence or keyboard noise only | nothing inserted |
 | GPU memory, both models loaded | 4.3 GB of 8 GB |
 
-## Quick start
+## Install
+
+### Windows 10/11
 
 1. Download `Voxora_x.y.z_x64-setup.exe` from [Releases](https://github.com/ParshvCrafts/Voxora/releases) and run it.
+   SmartScreen may warn because the installer is unsigned: click **More info**, then **Run anyway**.
 2. On first launch click **Download and start**. Voxora fetches pinned, SHA-256-verified builds
-   of whisper.cpp, llama.cpp and the models (~4.7 GB download with an NVIDIA GPU).
-3. Click into any text field, hold **Right Alt**, speak, release.
+   of whisper.cpp, llama.cpp and the models (about 4.7 GB with an NVIDIA GPU).
+3. Click into any text field, hold **Right Alt**, speak, let go.
 
-Requirements: Windows 10/11 x64. NVIDIA GPU with about 5 GB of free VRAM recommended (both models use 4.3 GB); without one Voxora
-uses CPU builds (slower) and you can turn off the AI rewrite for instant rule-based cleanup.
+An NVIDIA GPU with about 5 GB free VRAM is recommended. Without one, Voxora uses CPU builds and a
+smaller rewrite model, and you can turn the AI rewrite off for instant rule-based cleanup.
 
-| Shortcut | Action |
-|---|---|
-| Hold Right Alt | Push-to-talk |
-| Tap Right Alt | Hands-free on; tap again or pause to finish |
-| Esc (while recording) | Cancel |
-| Ctrl+Alt+M | Cycle mode |
-| Ctrl+Alt+V | Paste last dictation again |
+### macOS 13.3+ on Apple silicon (beta)
+
+1. Download `Voxora_x.y.z_aarch64.dmg` from [Releases](https://github.com/ParshvCrafts/Voxora/releases)
+   and drag Voxora to Applications.
+2. Open it. macOS will refuse at first because the app is not notarized (that needs a paid Apple
+   account). Go to **System Settings > Privacy & Security**, scroll down, and click
+   **Open Anyway**. (Or run `xattr -dr com.apple.quarantine /Applications/Voxora.app` once.)
+3. Voxora lives in the menu bar. The Home page shows **One permission to go**: click
+   **Open System Settings** and turn Voxora on under **Accessibility**. That single permission
+   lets it hear the dictation key and press Command+V for you. Allow the microphone when asked.
+4. Click **Download and start** (about 3.6 GB), then hold **Right Option**, speak, let go.
+
+### Shortcuts
+
+| Windows | Mac | Action |
+|---|---|---|
+| Hold Right Alt | Hold Right Option | Dictate while held |
+| Tap Right Alt | Tap Right Option | Hands-free; tap again or pause to finish |
+| Esc | Esc | Cancel while listening |
+| Ctrl+Alt+M | Control+Option+M | Switch mode |
+| Ctrl+Alt+V | Control+Option+V | Paste the last dictation again |
+| Ctrl+Z | Command+Z | Undo an insertion (in the app you dictated into) |
 
 ### Build from source
 
-```powershell
-# Rust (MSVC), Node 22+, pnpm
+```bash
+# Rust, Node 22+, pnpm
 pnpm install
 pnpm tauri dev          # run
-pnpm tauri build        # NSIS + MSI installers in target/release/bundle
-cargo test --workspace  # unit tests
+pnpm tauri build        # Windows: NSIS + MSI. macOS: .app + .dmg (see the macos job in ci.yml for whisper-server)
+cargo test --workspace
 ```
 
-The models and runtimes are not in the repo; the app downloads them on first run into
-`%LOCALAPPDATA%\Voxora`.
+Models and runtimes are not in the repo; the app downloads them on first run into
+`%LOCALAPPDATA%\Voxora` (Windows) or `~/Library/Application Support/Voxora` (macOS).
 
 ## Status
 
-Verified on the hardware above:
-- 71 unit tests (text pipeline, math parser, guard, storage, gesture timing, audio resampling,
-  WAV I/O, zip safety) plus a live-clipboard round-trip test.
-- `scripts/e2e.ps1` drives the real app (run against the release build) through a virtual audio cable: push-to-talk,
-  hands-free auto-stop, Esc cancel, silence rejection, self-correction, spoken math, and
-  clipboard restoration all pass.
-- Kill-on-close job object: force-killing Voxora leaves no inference server running.
+Verified:
+- 79 unit tests on Windows, and the same core suite plus macOS key-map tests on macOS (text
+  pipeline, golden-case rules, math parser, guard, storage, gesture timing, resampling, archive
+  safety), plus a live clipboard round-trip test on Windows.
+- Windows, on the hardware above: `scripts/e2e.ps1` drives the real app through a virtual audio
+  cable (push-to-talk, hands-free auto-stop, Esc cancel, silence rejection, self-correction,
+  spoken math, clipboard restore), last run on v0.1; v0.2 was re-checked with unit tests, both
+  benchmarks and the real app's screenshots. A force-killed Voxora leaves no inference server
+  running.
+- macOS, on GitHub's Apple silicon runners for every push: clippy and tests on the macOS code,
+  `.app` and `.dmg` bundling, the bundled whisper-server transcribing a spoken sentence
+  correctly, the pinned llama.cpp runtime passing its checksum and starting, and the app
+  launching and installing its keyboard listener.
 
 Not yet verified:
-- Elevated (admin) target windows were handled by design and code review, not by an automated test.
-- Benchmarks use synthesized voices (Windows SAPI), which are cleaner than a real microphone;
-  treat the WER as a lower bound.
-- Only tested on one machine; AMD/Intel GPUs fall back to CPU builds.
-- Installer is unsigned, so SmartScreen will warn on first run.
+- **macOS on a real Mac.** No Mac was available while building this. Holding the key, the HUD,
+  pasting and clipboard restore follow Apple's documented APIs, but nobody has used them by hand
+  yet. If you try it, please [open an issue](https://github.com/ParshvCrafts/Voxora/issues)
+  with what worked.
+- Elevated (admin) windows on Windows are handled by design and code review, not by an
+  automated test.
+- Benchmarks use synthesized voices, which are cleaner and stranger than a real microphone.
+- Tested on one Windows machine; AMD and Intel GPUs fall back to CPU builds.
 
 ## Project layout
 
 ```
 crates/voxora-core   text pipeline, math parser, guard, storage, engine clients, bench_eval
-src-tauri            Windows app: hook, audio, injection, orchestrator, tray
-src                  React UI: settings/history window and the overlay pill
-bench                benchmark cases and results
-scripts              benchmark audio generation, end-to-end test
-docs                 architecture, decisions, benchmarks, troubleshooting, original blueprint
+src-tauri            the app: audio, orchestrator, tray, IPC; Windows modules in src/, macOS in src/mac/
+src                  React UI: main window and the HUD
+bench                benchmark cases (core + golden) and results
+scripts              benchmark audio, end-to-end test, README image capture
+docs                 architecture, decisions, benchmarks, troubleshooting, research, original blueprint
 ```
 
 Problems? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## License
 
-MIT © Parshv Patel. Bundled at runtime (downloaded, not redistributed here):
+MIT © Parshv Patel. Downloaded at runtime, not redistributed here:
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and
-[llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT),
+[llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT; the macOS app bundles a whisper-server
+built from whisper.cpp source),
 [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) (MIT),
 [Qwen3.5](https://huggingface.co/Qwen/Qwen3.5-4B) (Apache-2.0),
-[Silero VAD](https://github.com/snakers4/silero-vad) (MIT).
+[Silero VAD](https://github.com/snakers4/silero-vad) (MIT),
+[Inter](https://rsms.me/inter/) (OFL).

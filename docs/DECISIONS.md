@@ -82,3 +82,22 @@ between runs ("ship v2" vs "shipping v2"); temperature 0 made two consecutive ru
 with no quality loss on either benchmark (30/30 and 19/19). Spoken symbol joining is
 Technical-mode only and needs a strong joiner (slash, backslash, underscore, or a dot before a
 known extension/TLD), so prose like "the red dot" is never glued together.
+
+## D13: macOS port shape (2026-11-24)
+- Same engine, four swapped OS modules (`#[cfg_attr(path)]`), not a trait layer: each OS has
+  exactly one implementation, so a trait would add indirection with no second caller.
+- Listen-only `CGEventTap`, not an active tap: it cannot swallow the key, but an active tap
+  that loses Accessibility can freeze keyboard input system-wide (Apple forum reports). One
+  permission (Accessibility) covers listening and posting Command+V.
+- HUD via `orderFrontRegardless` + ignore-mouse on Tauri's NSWindow instead of the
+  `tauri-nspanel` plugin: no extra dependency; it never makes the window key. Revisit if a real
+  Mac shows focus being stolen.
+- whisper.cpp publishes no macOS server binary. CI builds `whisper-server` from tag b5907
+  (Metal, static, shaders embedded, links only system frameworks) and bundles it with
+  `externalBin`, so there is no third-party binary host to trust. llama.cpp's official
+  b12649 macOS arm64 build is pinned by SHA-256 (GitHub digest and an independent hash agreed).
+- Verified only on GitHub's macos-15 runners (owner has no Mac): clippy, tests, bundling, a
+  spoken sentence transcribed correctly by the bundled server, llama runtime start, and app
+  launch with the event tap installed. Labelled beta until someone confirms by hand.
+- Bundle identifier changed from `dev.voxora.app` to `dev.voxora.desktop` (an `.app` suffix
+  clashes with macOS bundles); safe because no installer had been published.
