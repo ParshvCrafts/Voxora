@@ -113,3 +113,18 @@ not catch it. Fix: only errors that end the stream cancel; `Xrun`, `DeviceChange
 `buffer_glitches_do_not_cancel_a_dictation`). Also added stage logs ("recording started",
 gesture input/action at debug) so the next report can be diagnosed from the log alone.
 Lesson: run the real-hardware check on the default microphone, not only the virtual cable.
+
+## D15: Raw device input off; the hotkey must work inside Voxora too (2026-11-24, v0.2.2)
+Owner report after v0.2.1: dictation worked in VS Code and Chrome but pressing Right Alt in
+Voxora's own window did nothing. Reproduced with injected keys and a hook-level log: while any
+Voxora window had focus, Windows never called our `WH_KEYBOARD_LL` hook for key-downs (Right
+Alt down, Esc down); key-ups still arrived. Ruled out by experiment: hook-chain order
+(re-installing the hook on focus changed nothing) and WebView2 focus. Cause: tao registers the
+process for raw keyboard input while one of its windows is focused (`DeviceEventFilter::
+Unfocused`, the default). Voxora uses no device events, so `device_event_filter(Always)`
+removes the registration; the hook then sees every key, verified 6/6 and in `scripts/e2e.ps1`.
+Second bug found on the way: the hook swallowed the lone key-up whose down it never saw, so
+Windows kept Alt marked as held system-wide (later keys in any app arrived as Alt+key). Now a
+key-up is swallowed only if we swallowed its key-down (tests in `hotkey.rs`). Rejected: a
+JS key-forwarding workaround from the webview (worked, but lost the first key after window
+activation and duplicated the root fix). The e2e suite now dictates into the Home "Try it" box.

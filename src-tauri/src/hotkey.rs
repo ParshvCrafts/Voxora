@@ -35,7 +35,10 @@ struct HookState {
     dictation_vk: AtomicU32,
     cycle_vk: AtomicU32,
     repaste_vk: AtomicU32,
+    /// We swallowed the dictation key's down (so we also own its up).
     held: AtomicBool,
+    /// Same for Esc while recording.
+    esc_down: AtomicBool,
     recording: AtomicBool,
     paused: AtomicBool,
 }
@@ -84,6 +87,7 @@ pub fn install(sink: impl Fn(HotkeyEvent) + Send + Sync + 'static, dictation_key
         cycle_vk: AtomicU32::new(letter_vk(cycle)),
         repaste_vk: AtomicU32::new(letter_vk(repaste)),
         held: AtomicBool::new(false),
+        esc_down: AtomicBool::new(false),
         recording: AtomicBool::new(false),
         paused: AtomicBool::new(false),
     };
@@ -169,20 +173,29 @@ fn handle(s: &HookState, msg: u32, k: &KBDLLHOOKSTRUCT) -> bool {
     let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
     let up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
     let at_ms = u64::from(k.time);
+    // A key-up is swallowed only if we swallowed its key-down. Swallowing a lone up (its down
+    // went to the app) would leave Windows thinking the key is still held, so every later
+    // keystroke in any app would arrive as Alt+key.
     if k.vkCode == s.dictation_vk.load(Ordering::Relaxed) {
-        if down && !s.held.swap(true, Ordering::Relaxed) {
-            (s.sink)(HotkeyEvent::Down { at_ms });
-        } else if up {
-            s.held.store(false, Ordering::Relaxed);
+        if down {
+            if !s.held.swap(true, Ordering::Relaxed) {
+                (s.sink)(HotkeyEvent::Down { at_ms });
+            }
+            return true;
+        }
+        let ours = up && s.held.swap(false, Ordering::Relaxed);
+        if ours {
             (s.sink)(HotkeyEvent::Up { at_ms });
         }
-        return true;
+        return ours;
     }
-    if k.vkCode == VK_ESCAPE.0 as u32 && s.recording.load(Ordering::Relaxed) {
-        if down {
+    if k.vkCode == VK_ESCAPE.0 as u32 {
+        if down && s.recording.load(Ordering::Relaxed) {
             (s.sink)(HotkeyEvent::Escape);
+            s.esc_down.store(true, Ordering::Relaxed);
+            return true;
         }
-        return true;
+        return up && s.esc_down.swap(false, Ordering::Relaxed);
     }
     if down && pressed(VK_CONTROL.0) && pressed(VK_MENU.0) {
         if k.vkCode == s.cycle_vk.load(Ordering::Relaxed) {
@@ -207,5 +220,58 @@ mod tests {
         assert_eq!(vk_for("capslock"), 0x14);
         assert_eq!(vk_for("nonsense"), 0xA5, "unknown names fall back to Right Alt");
         assert_eq!(letter_vk('m'), 0x4D);
+    }
+
+    use std::sync::Mutex;
+
+    fn state(sink: impl Fn(HotkeyEvent) + Send + Sync + 'static) -> HookState {
+        HookState {
+            sink: Box::new(sink),
+            dictation_vk: AtomicU32::new(0xA5),
+            cycle_vk: AtomicU32::new(0),
+            repaste_vk: AtomicU32::new(0),
+            held: AtomicBool::new(false),
+            esc_down: AtomicBool::new(false),
+            recording: AtomicBool::new(false),
+            paused: AtomicBool::new(false),
+        }
+    }
+
+    fn key(vk: u32, time: u32) -> KBDLLHOOKSTRUCT {
+        KBDLLHOOKSTRUCT { vkCode: vk, time, ..Default::default() }
+    }
+
+    #[test]
+    fn a_held_key_is_one_press_and_is_swallowed() {
+        static SEEN: Mutex<Vec<HotkeyEvent>> = Mutex::new(Vec::new());
+        let s = state(|e| SEEN.lock().unwrap().push(e));
+        assert!(handle(&s, WM_SYSKEYDOWN, &key(0xA5, 1)));
+        assert!(handle(&s, WM_SYSKEYDOWN, &key(0xA5, 2)), "auto-repeat is swallowed too");
+        assert!(handle(&s, WM_KEYUP, &key(0xA5, 3)));
+        assert_eq!(*SEEN.lock().unwrap(), vec![HotkeyEvent::Down { at_ms: 1 }, HotkeyEvent::Up { at_ms: 3 }]);
+    }
+
+    /// D15: when a key-down never reached the hook, swallowing the lone key-up would leave
+    /// Windows thinking Alt is held, turning every later keystroke into Alt+key.
+    #[test]
+    fn a_key_up_whose_down_we_never_saw_passes_through() {
+        static SEEN: Mutex<Vec<HotkeyEvent>> = Mutex::new(Vec::new());
+        let s = state(|e| SEEN.lock().unwrap().push(e));
+        assert!(!handle(&s, WM_KEYUP, &key(0xA5, 1)), "lone dictation key-up must pass");
+        s.recording.store(true, Ordering::Relaxed);
+        assert!(!handle(&s, WM_KEYUP, &key(0x1B, 2)), "lone Esc key-up must pass");
+        assert!(SEEN.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn esc_cancels_only_while_recording() {
+        static SEEN: Mutex<Vec<HotkeyEvent>> = Mutex::new(Vec::new());
+        let s = state(|e| SEEN.lock().unwrap().push(e));
+        assert!(!handle(&s, WM_KEYDOWN, &key(0x1B, 1)), "Esc belongs to the app when idle");
+        assert!(!handle(&s, WM_KEYUP, &key(0x1B, 2)));
+        s.recording.store(true, Ordering::Relaxed);
+        assert!(handle(&s, WM_KEYDOWN, &key(0x1B, 3)));
+        assert!(handle(&s, WM_KEYUP, &key(0x1B, 4)));
+        assert_eq!(*SEEN.lock().unwrap(), vec![HotkeyEvent::Escape]);
     }
 }

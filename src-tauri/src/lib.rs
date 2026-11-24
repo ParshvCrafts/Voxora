@@ -66,6 +66,10 @@ pub fn run() {
     let minimized = std::env::args().any(|a| a == "--minimized");
 
     tauri::Builder::default()
+        // Voxora uses no raw device events. With tao's default (raw keyboard input registered
+        // while a Voxora window has focus), Windows skips our low-level hook for key-downs aimed
+        // at our own windows, so the dictation key did nothing inside Voxora (D15).
+        .device_event_filter(tauri::DeviceEventFilter::Always)
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .setup(move |app| {
