@@ -46,8 +46,16 @@ pub fn adopt_child(child: &std::process::Child) {
     }
 }
 
+fn hwnd(w: &tauri::WebviewWindow) -> Option<HWND> {
+    w.hwnd().ok().map(|h| HWND(h.0))
+}
+
+/// The job object already kills children when Voxora dies, so there is nothing to clean up.
+pub fn reap_orphans() {}
+
 /// Make a window float without ever taking focus, and let clicks pass through it.
-pub fn make_overlay(hwnd: HWND) {
+pub fn make_overlay(w: &tauri::WebviewWindow) {
+    let Some(hwnd) = hwnd(w) else { return };
     unsafe {
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         let want = (WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0 | WS_EX_TRANSPARENT.0) as isize;
@@ -56,7 +64,8 @@ pub fn make_overlay(hwnd: HWND) {
 }
 
 /// Show bottom-center on the monitor the user is working on, without activating.
-pub fn show_overlay(hwnd: HWND, bottom_margin_px: i32) {
+pub fn show_overlay(w: &tauri::WebviewWindow, bottom_margin_px: i32) {
+    let Some(hwnd) = hwnd(w) else { return };
     unsafe {
         let mon = MonitorFromWindow(GetForegroundWindow(), MONITOR_DEFAULTTONEAREST);
         let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
@@ -73,7 +82,8 @@ pub fn show_overlay(hwnd: HWND, bottom_margin_px: i32) {
     }
 }
 
-pub fn hide_overlay(hwnd: HWND) {
+pub fn hide_overlay(w: &tauri::WebviewWindow) {
+    let Some(hwnd) = hwnd(w) else { return };
     unsafe {
         let _ = ShowWindow(hwnd, SW_HIDE);
     }

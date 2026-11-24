@@ -34,7 +34,7 @@ export default function Setup({ onDone }: { onDone: () => void }) {
   };
 
   const gpu = status.gpu?.split(" · ")[0] ?? (IS_MAC ? "Apple silicon" : null);
-  const size = gpu ? "4.7" : "1.9";
+  const size = IS_MAC ? "3.6" : gpu ? "4.7" : "1.9"; // Mac: no CUDA libraries to fetch
 
   return (
     <div className="page" style={{ maxWidth: 600, paddingTop: 24 }}>

@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 pub enum Kind {
     /// Single file placed in the models directory.
     Model,
-    /// Zip extracted into `runtime/<id>/`.
+    /// Archive (zip or tar.gz) extracted into `runtime/<id>/`.
     Runtime,
 }
 
@@ -64,6 +64,16 @@ pub const CATALOG: &[Asset] = &[
         url: "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-win-cpu-x64.zip",
         sha256: "0e2ff97a5ef40de3e4ca910231676c044e0813c54727b2012022a2d2401e1fa9",
         bytes: 25_096_466,
+    },
+    Asset {
+        // Metal build for Apple silicon. Dylibs are versioned symlinks: extract with symlinks.
+        id: "llama-macos",
+        label: "llama.cpp b12649 server (Metal)",
+        kind: Kind::Runtime,
+        file: "llama-b12649-bin-macos-arm64.tar.gz",
+        url: "https://github.com/ggml-org/llama.cpp/releases/download/b12649/llama-b12649-bin-macos-arm64.tar.gz",
+        sha256: "04db8281b11189b91b159c7890688b7dc3bc62a95fe81ec5c8078067be5bb4ad",
+        bytes: 16_643_876,
     },
     Asset {
         id: "whisper-large-v3-turbo-q8",
@@ -203,8 +213,52 @@ async fn fetch_into(
     file.flush().map_err(|e| e.to_string())
 }
 
+/// Extract a runtime archive (`.zip` or `.tar.gz`) into `dir`, flattening a single top-level
+/// folder if present.
+pub fn extract(archive: &Path, dir: &Path) -> Result<(), String> {
+    if archive.to_string_lossy().ends_with(".tar.gz") {
+        extract_tar_gz(archive, dir)
+    } else {
+        extract_zip(archive, dir)
+    }
+}
+
+/// tar.gz keeps Unix modes and symlinks (llama.cpp's macOS dylibs depend on both).
+fn extract_tar_gz(path: &Path, dir: &Path) -> Result<(), String> {
+    let open = || -> Result<tar::Archive<flate2::read::GzDecoder<std::fs::File>>, String> {
+        let f = std::fs::File::open(path).map_err(|e| e.to_string())?;
+        Ok(tar::Archive::new(flate2::read::GzDecoder::new(f)))
+    };
+    let names: Vec<String> = open()?
+        .entries()
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok().and_then(|e| e.path().ok().map(|p| p.to_string_lossy().replace('\\', "/"))))
+        .collect();
+    let prefix = common_root(&names);
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let mut a = open()?;
+    a.set_preserve_permissions(true);
+    for e in a.entries().map_err(|e| e.to_string())? {
+        let mut e = e.map_err(|e| e.to_string())?;
+        let p = e.path().map_err(|e| e.to_string())?.into_owned();
+        if p.components().any(|c| !matches!(c, std::path::Component::Normal(_))) {
+            return Err(format!("unsafe path in archive: {}", p.display()));
+        }
+        let rel = p.strip_prefix(&prefix).unwrap_or(&p).to_path_buf();
+        if rel.as_os_str().is_empty() {
+            continue;
+        }
+        let out = dir.join(rel);
+        if let Some(parent) = out.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        e.unpack(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+    }
+    Ok(())
+}
+
 /// Extract a runtime zip into `dir`, flattening a single top-level folder if present.
-pub fn extract_zip(zip_path: &Path, dir: &Path) -> Result<(), String> {
+fn extract_zip(zip_path: &Path, dir: &Path) -> Result<(), String> {
     let f = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
     let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
     let names: Vec<String> =
@@ -280,5 +334,36 @@ mod tests {
         extract_zip(&zp, &out).unwrap();
         assert_eq!(std::fs::read(out.join("server.exe")).unwrap(), b"exe");
         assert!(!dir.path().join("evil.txt").exists());
+    }
+
+    fn tar_gz(path: &Path, entries: &[(&str, &[u8])]) {
+        let gz = flate2::write::GzEncoder::new(std::fs::File::create(path).unwrap(), flate2::Compression::fast());
+        let mut b = tar::Builder::new(gz);
+        for (name, data) in entries {
+            let mut h = tar::Header::new_gnu();
+            h.set_size(data.len() as u64);
+            h.set_mode(0o755);
+            // set_path refuses "..", so write the raw name to build a hostile archive too.
+            h.as_gnu_mut().unwrap().name[..name.len()].copy_from_slice(name.as_bytes());
+            h.set_cksum();
+            b.append(&h, *data).unwrap();
+        }
+        b.into_inner().unwrap().finish().unwrap();
+    }
+
+    #[test]
+    fn tar_gz_extract_flattens_root_and_rejects_traversal() {
+        let dir = tempfile::tempdir().unwrap();
+        let ok = dir.path().join("ok.tar.gz");
+        tar_gz(&ok, &[("llama-b1/llama-server", b"bin"), ("llama-b1/lib/libggml.dylib", b"lib")]);
+        let out = dir.path().join("out");
+        extract(&ok, &out).unwrap();
+        assert_eq!(std::fs::read(out.join("llama-server")).unwrap(), b"bin");
+        assert_eq!(std::fs::read(out.join("lib/libggml.dylib")).unwrap(), b"lib");
+
+        let bad = dir.path().join("bad.tar.gz");
+        tar_gz(&bad, &[("x/../../evil", b"x")]);
+        assert!(extract(&bad, &dir.path().join("out2")).is_err());
+        assert!(!dir.path().join("evil").exists());
     }
 }

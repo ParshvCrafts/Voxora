@@ -49,8 +49,12 @@ pub struct Paths {
 
 impl Paths {
     pub fn new() -> Self {
-        let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-        let root = base.join("Voxora");
+        // %LOCALAPPDATA%\Voxora on Windows, ~/Library/Application Support/Voxora on macOS.
+        #[cfg(windows)]
+        let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+        #[cfg(target_os = "macos")]
+        let base = std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Application Support"));
+        let root = base.unwrap_or_else(std::env::temp_dir).join("Voxora");
         Self {
             models: root.join("models"),
             runtime: root.join("runtime"),
@@ -62,10 +66,18 @@ impl Paths {
         }
     }
     fn whisper_exe(&self) -> PathBuf {
-        self.runtime.join("whisper").join("whisper-server.exe")
+        // macOS: whisper.cpp publishes no server binary, so CI builds one and bundles it inside
+        // Voxora.app next to the main executable (tauri externalBin).
+        #[cfg(target_os = "macos")]
+        if let Some(p) = std::env::current_exe().ok().and_then(|e| Some(e.parent()?.join("whisper-server")))
+            && p.exists()
+        {
+            return p;
+        }
+        self.runtime.join("whisper").join(runtime_exe("whisper"))
     }
     fn llama_exe(&self) -> PathBuf {
-        self.runtime.join("llama").join("llama-server.exe")
+        self.runtime.join("llama").join(runtime_exe("llama"))
     }
 }
 
@@ -85,6 +97,8 @@ pub struct EngineStatus {
     pub missing: Vec<&'static str>,
     pub paused: bool,
     pub gpu: Option<String>,
+    /// macOS: what permission is missing, in words for the UI. Always None on Windows.
+    pub permission: Option<&'static str>,
 }
 
 pub enum Msg {
@@ -190,6 +204,7 @@ impl Engine {
         let mut s = self.status.lock().unwrap().clone();
         s.paused = hotkey::is_paused();
         s.missing = self.missing_assets();
+        s.permission = hotkey::permission_problem();
         s
     }
 
@@ -211,13 +226,10 @@ impl Engine {
     fn overlay_with_mode(&self, kind: &'static str, mode: Mode, message: Option<String>, hands_free: bool) {
         let Some(w) = self.app.get_webview_window("overlay") else { return };
         let _ = self.app.emit_to("overlay", "overlay", Overlay { kind, mode: mode.badge(), message, hands_free });
-        if let Ok(h) = w.hwnd() {
-            let hwnd = target::hwnd(h.0 as isize);
-            if kind == "hidden" {
-                winutil::hide_overlay(hwnd);
-            } else {
-                winutil::show_overlay(hwnd, 56);
-            }
+        if kind == "hidden" {
+            winutil::hide_overlay(&w);
+        } else {
+            winutil::show_overlay(&w, 56);
         }
     }
 
@@ -450,9 +462,9 @@ impl Engine {
             }
             _ => {
                 let msg = if target.ctx.elevated {
-                    "Admin window: press Ctrl+V to paste".to_string()
+                    BLOCKED_HINT.to_string()
                 } else {
-                    "Copied. Paste it with Ctrl+V.".to_string()
+                    format!("Copied. Paste it with {PASTE_KEYS}.")
                 };
                 self.overlay_with_mode("notice", mode, Some(msg), false);
                 self.overlay_hide_after(3000);
@@ -472,12 +484,12 @@ impl Engine {
         let _guard = self.inject_lock.lock().await;
         let t = Instant::now();
         // The user may have switched windows while we transcribed; text goes where focus is now.
-        let now = if target::foreground_hwnd() == 0 { None } else { Some(target::foreground()) };
+        let now = target::has_foreground().then(target::foreground);
         let elevated = now.as_ref().map(|t| t.ctx.elevated).unwrap_or(ctx.elevated);
         let ms = || t.elapsed().as_millis() as i64;
         if elevated || now.is_none() {
             return match inject::set_text(text, false) {
-                Ok(_) => (RowStatus::ClipboardOnly, ms(), Some("target window is elevated (UIPI)".into())),
+                Ok(_) => (RowStatus::ClipboardOnly, ms(), Some(BLOCKED_REASON.into())),
                 Err(e) => (RowStatus::Failed, ms(), Some(e)),
             };
         }
@@ -529,7 +541,7 @@ impl Engine {
         let profile = resolve(&ctx, &s.app_rules, s.mode, s.auto_context);
         let (status, _, _) = self.insert(last.best_text(), &ctx, profile, &s).await;
         if status != RowStatus::Inserted {
-            self.overlay("notice", Some("Copied. Paste it with Ctrl+V.".into()), false);
+            self.overlay("notice", Some(format!("Copied. Paste it with {PASTE_KEYS}.")), false);
             self.overlay_hide_after(2500);
         }
     }
@@ -770,10 +782,15 @@ impl Engine {
             self.update_settings(s)?;
         }
         let s = self.settings();
-        let mut ids = vec![if gpu { "whisper-cuda" } else { "whisper-cpu" }, "silero-vad"];
-        ids.push("whisper-large-v3-turbo-q8");
+        #[cfg(windows)]
+        let (whisper_rt, llama_rt) =
+            (Some(if gpu { "whisper-cuda" } else { "whisper-cpu" }), if gpu { "llama-cuda" } else { "llama-cpu" });
+        #[cfg(target_os = "macos")]
+        let (whisper_rt, llama_rt) = (None::<&str>, "llama-macos"); // whisper-server ships in the app bundle
+        let mut ids: Vec<&str> = whisper_rt.into_iter().collect();
+        ids.extend(["silero-vad", "whisper-large-v3-turbo-q8"]);
         if s.llm.enabled && s.llm.managed {
-            ids.push(if gpu { "llama-cuda" } else { "llama-cpu" });
+            ids.push(llama_rt);
             ids.push(if s.llm.model.contains("2B") { "qwen3.5-2b" } else { "qwen3.5-4b" });
         }
         for id in ids {
@@ -807,8 +824,8 @@ impl Engine {
                     .app
                     .emit("setup-progress", serde_json::json!({ "id": id, "label": a.label, "phase": "unpacking" }));
                 let dir = self.paths.runtime.join(runtime_dir(id));
-                let (zip, d) = (dest.clone(), dir.clone());
-                tauri::async_runtime::spawn_blocking(move || download::extract_zip(&zip, &d))
+                let (archive, d) = (dest.clone(), dir.clone());
+                tauri::async_runtime::spawn_blocking(move || download::extract(&archive, &d))
                     .await
                     .map_err(|e| e.to_string())??;
                 let _ = std::fs::remove_file(&dest);
@@ -845,8 +862,27 @@ fn runtime_dir(id: &str) -> &'static str {
 }
 
 fn runtime_exe(id: &str) -> &'static str {
-    if id.starts_with("whisper") { "whisper-server.exe" } else { "llama-server.exe" }
+    match (id.starts_with("whisper"), cfg!(windows)) {
+        (true, true) => "whisper-server.exe",
+        (true, false) => "whisper-server",
+        (false, true) => "llama-server.exe",
+        (false, false) => "llama-server",
+    }
 }
+
+/// How the user pastes by hand, and why we could not paste for them.
+#[cfg(windows)]
+const PASTE_KEYS: &str = "Ctrl+V";
+#[cfg(windows)]
+const BLOCKED_HINT: &str = "Admin window: press Ctrl+V to paste";
+#[cfg(windows)]
+const BLOCKED_REASON: &str = "target window is elevated (UIPI)";
+#[cfg(target_os = "macos")]
+const PASTE_KEYS: &str = "Command+V";
+#[cfg(target_os = "macos")]
+const BLOCKED_HINT: &str = "Secure input is on: press Command+V";
+#[cfg(target_os = "macos")]
+const BLOCKED_REASON: &str = "secure keyboard entry is on (password field or terminal setting)";
 
 /// D7: llama.cpp needs the same CUDA 12.4 DLLs whisper.cpp ships; hard-link instead of a
 /// second 391 MB download.
@@ -949,7 +985,26 @@ fn validate(s: &Settings) -> Result<(), String> {
     Ok(())
 }
 
+/// "Apple M2 · 16 GB unified memory" on Apple silicon (Metal). Intel Macs get CPU builds.
+#[cfg(target_os = "macos")]
+pub fn gpu_info() -> Option<String> {
+    if !cfg!(target_arch = "aarch64") {
+        return None;
+    }
+    let sysctl = |k: &str| {
+        let o = std::process::Command::new("sysctl").args(["-n", k]).output().ok()?;
+        Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+    };
+    let chip = sysctl("machdep.cpu.brand_string").filter(|c| !c.is_empty()).unwrap_or_else(|| "Apple silicon".into());
+    let mem = sysctl("hw.memsize").and_then(|m| m.parse::<f64>().ok()).map(|b| b / 1_073_741_824.0);
+    Some(match mem {
+        Some(gb) => format!("{chip} · {gb:.0} GB unified memory"),
+        None => chip,
+    })
+}
+
 /// "NVIDIA GeForce RTX 4060 Laptop GPU · 4.3 / 8.0 GB" or None without an NVIDIA GPU.
+#[cfg(windows)]
 pub fn gpu_info() -> Option<String> {
     let mut cmd = std::process::Command::new("nvidia-smi");
     cmd.args(["--query-gpu=name,memory.used,memory.total", "--format=csv,noheader,nounits"]);

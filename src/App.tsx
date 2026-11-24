@@ -52,6 +52,13 @@ export default function App() {
     return () => offs.forEach((f) => f());
   }, [reload]);
 
+  // macOS: the user grants Accessibility in System Settings; notice it without a restart.
+  useEffect(() => {
+    if (!status.permission) return;
+    const t = setInterval(() => api.getStatus().then(setStatus).catch(() => {}), 2000);
+    return () => clearInterval(t);
+  }, [status.permission]);
+
   useEffect(() => {
     const t = settings?.theme ?? "system";
     if (t === "system") document.documentElement.removeAttribute("data-theme");

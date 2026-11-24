@@ -4,7 +4,7 @@
 use std::ffi::c_void;
 
 use voxora_core::context::AppContext;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND};
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Security::{GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation};
 use windows::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -31,12 +31,9 @@ pub fn foreground() -> Target {
     }
 }
 
-pub fn foreground_hwnd() -> isize {
-    unsafe { GetForegroundWindow().0 as isize }
-}
-
-pub fn hwnd(raw: isize) -> HWND {
-    HWND(raw as *mut c_void)
+/// False on the secure desktop / lock screen, where there is nothing to paste into.
+pub fn has_foreground() -> bool {
+    unsafe { !GetForegroundWindow().0.is_null() }
 }
 
 /// (exe file name, elevated). A process we cannot even query is treated as elevated: that is

@@ -1,13 +1,19 @@
-//! Voxora desktop app: tray, overlay, settings window, and the Win32 integration around the
-//! platform-neutral `voxora-core` pipeline.
+//! Voxora desktop app: tray, overlay, settings window, and the OS integration (Win32 or
+//! macOS) around the platform-neutral `voxora-core` pipeline.
+//!
+//! The four OS modules share one API; macOS builds swap in the files under `src/mac/`.
 
 mod audio;
 mod commands;
 mod engine;
+#[cfg_attr(target_os = "macos", path = "mac/hotkey.rs")]
 mod hotkey;
+#[cfg_attr(target_os = "macos", path = "mac/inject.rs")]
 mod inject;
+#[cfg_attr(target_os = "macos", path = "mac/target.rs")]
 mod target;
 mod tray;
+#[cfg_attr(target_os = "macos", path = "mac/winutil.rs")]
 mod winutil;
 
 use std::sync::Arc;
@@ -63,6 +69,10 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .setup(move |app| {
+            // Menu bar app: no Dock icon, and showing the HUD never activates Voxora.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            winutil::reap_orphans();
             let handle = app.handle().clone();
             let (engine, rx) = Engine::new(handle.clone());
             app.manage(engine.clone());
@@ -72,10 +82,8 @@ pub fn run() {
                 tauri::WebviewWindowBuilder::from_config(&handle, &cfg)?.build()?;
             }
 
-            if let Some(ov) = app.get_webview_window("overlay")
-                && let Ok(h) = ov.hwnd()
-            {
-                winutil::make_overlay(target::hwnd(h.0 as isize));
+            if let Some(ov) = app.get_webview_window("overlay") {
+                winutil::make_overlay(&ov);
             }
             let s = engine.settings();
             hotkey::install(
@@ -119,6 +127,7 @@ pub fn run() {
             commands::restart_engines,
             commands::set_paused,
             commands::open_folder,
+            commands::request_permission,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Voxora")

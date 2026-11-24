@@ -101,6 +101,11 @@ pub fn set_paused(app: tauri::AppHandle, paused: bool) {
 }
 
 #[tauri::command]
+pub fn request_permission() {
+    hotkey::request_permission();
+}
+
+#[tauri::command]
 pub fn open_folder(engine: E<'_>, which: String) -> Result<(), String> {
     let p = match which.as_str() {
         "logs" => &engine.paths.logs,
@@ -108,5 +113,6 @@ pub fn open_folder(engine: E<'_>, which: String) -> Result<(), String> {
         _ => return Err("unknown folder".into()),
     };
     let _ = std::fs::create_dir_all(p);
-    std::process::Command::new("explorer.exe").arg(p).spawn().map(|_| ()).map_err(|e| e.to_string())
+    let opener = if cfg!(windows) { "explorer.exe" } else { "open" };
+    std::process::Command::new(opener).arg(p).spawn().map(|_| ()).map_err(|e| e.to_string())
 }

@@ -62,6 +62,7 @@ export interface Status {
   missing: string[];
   paused: boolean;
   gpu: string | null;
+  permission?: string | null;
 }
 
 export interface Stats {
@@ -97,6 +98,7 @@ export const api = {
   restartEngines: () => invoke<void>("restart_engines"),
   setPaused: (paused: boolean) => invoke<void>("set_paused", { paused }),
   openFolder: (which: "logs" | "data") => invoke<void>("open_folder", { which }),
+  requestPermission: () => invoke<void>("request_permission"),
 };
 
 export function on<T>(event: string, cb: (payload: T) => void): () => void {

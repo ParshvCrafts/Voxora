@@ -33,6 +33,17 @@ export default function Home({ go }: { go: (page: string) => void }) {
 
   return (
     <div className="page">
+      {status.permission && (
+        <div className="group pad" role="alert" style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>One permission to go</div>
+            <div className="muted">{status.permission}</div>
+          </div>
+          <button className="btn primary" onClick={() => api.requestPermission()}>
+            Open System Settings
+          </button>
+        </div>
+      )}
       <div className="group hero">
         <div>
           <h1>{status.paused ? "Voxora is paused." : `Hold ${key} and speak.`}</h1>

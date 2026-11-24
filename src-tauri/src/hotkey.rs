@@ -136,6 +136,13 @@ pub fn is_paused() -> bool {
     STATE.get().is_some_and(|s| s.paused.load(Ordering::Relaxed))
 }
 
+/// Windows needs no special permission for a low-level keyboard hook or SendInput.
+pub fn permission_problem() -> Option<&'static str> {
+    None
+}
+
+pub fn request_permission() {}
+
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code == HC_ACTION as i32
         && let Some(state) = STATE.get()

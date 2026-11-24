@@ -66,8 +66,14 @@ fn short(s: &str) -> &str {
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_menu(app)?;
-    TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().cloned().expect("bundle icon"))
+    // macOS menu bar: a monochrome template glyph that follows light/dark menu bars.
+    #[cfg(target_os = "macos")]
+    let builder = TrayIconBuilder::with_id("main")
+        .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray-template.png"))?)
+        .icon_as_template(true);
+    #[cfg(not(target_os = "macos"))]
+    let builder = TrayIconBuilder::with_id("main").icon(app.default_window_icon().cloned().expect("bundle icon"));
+    builder
         .tooltip("Voxora")
         .menu(&menu)
         .show_menu_on_left_click(false)

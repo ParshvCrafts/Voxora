@@ -1,7 +1,6 @@
-name: CI
+﻿name: CI
 on:
   push:
-    branches: [main]
   pull_request:
 
 jobs:
@@ -29,3 +28,91 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
         run: cargo test --workspace
+
+  macos:
+    # Apple silicon. No Mac was available during development, so this job is the macOS proof:
+    # it compiles, lints and tests on macOS, bundles the .dmg, and smoke-tests the real binaries.
+    runs-on: macos-14
+    env:
+      WHISPER_TAG: b5907
+      LLAMA_TAG: b12649
+      LLAMA_SHA256: 04db8281b11189b91b159c7890688b7dc3bc62a95fe81ec5c8078067be5bb4ad
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache whisper-server
+        id: whisper-cache
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/binaries/whisper-server-aarch64-apple-darwin
+          key: whisper-server-${{ env.WHISPER_TAG }}-macos-arm64-v1
+      - name: Build whisper-server from source (Metal, static)
+        if: steps.whisper-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$WHISPER_TAG" https://github.com/ggml-org/whisper.cpp /tmp/whisper.cpp
+          cmake -S /tmp/whisper.cpp -B /tmp/wb -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_NATIVE=OFF \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DWHISPER_BUILD_SERVER=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON
+          cmake --build /tmp/wb --config Release -j 4 --target whisper-server
+          mkdir -p src-tauri/binaries
+          cp /tmp/wb/bin/whisper-server src-tauri/binaries/whisper-server-aarch64-apple-darwin
+          codesign --force -s - src-tauri/binaries/whisper-server-aarch64-apple-darwin
+      - name: whisper-server links only system libraries
+        run: |
+          otool -L src-tauri/binaries/whisper-server-aarch64-apple-darwin
+          ! otool -L src-tauri/binaries/whisper-server-aarch64-apple-darwin | grep -E '@rpath|/usr/local|/opt/homebrew'
+
+      - run: pnpm install --frozen-lockfile
+      - name: Clippy (macOS code paths)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace
+      - name: Bundle Voxora.app and .dmg
+        run: pnpm tauri build --bundles app,dmg
+
+      - name: Smoke test, real transcription with the bundled whisper-server
+        run: |
+          APP=target/release/bundle/macos/Voxora.app
+          test -x "$APP/Contents/MacOS/whisper-server"
+          curl -sSL -o /tmp/tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin
+          say -o /tmp/hello.wav --data-format=LEI16@16000 "Voxora works on the Mac."
+          "$APP/Contents/MacOS/whisper-server" -m /tmp/tiny.bin --host 127.0.0.1 --port 18181 -nt -ng &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:18181/health && break; sleep 1; done
+          OUT=$(curl -sf http://127.0.0.1:18181/inference -F file=@/tmp/hello.wav -F response_format=json)
+          echo "$OUT"
+          echo "$OUT" | grep -qi "mac"
+          kill %1
+      - name: Smoke test, pinned llama.cpp runtime
+        run: |
+          curl -sSL -o /tmp/llama.tgz "https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/llama-$LLAMA_TAG-bin-macos-arm64.tar.gz"
+          echo "$LLAMA_SHA256  /tmp/llama.tgz" | shasum -a 256 -c
+          mkdir -p /tmp/llama && tar xzf /tmp/llama.tgz -C /tmp/llama --strip-components 1
+          /tmp/llama/llama-server --version
+      - name: Smoke test, the app launches and stays up
+        run: |
+          APP=target/release/bundle/macos/Voxora.app
+          "$APP/Contents/MacOS/voxora" --minimized &
+          sleep 15
+          kill -0 $! # still running
+          LOG=$(ls -t "$HOME/Library/Application Support/Voxora/logs/"voxora*.log | head -1)
+          cat "$LOG"
+          grep -q "starting" "$LOG"
+          ! grep -qi "panicked" "$LOG"
+          kill $!
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxora-macos-arm64-dmg
+          path: target/release/bundle/dmg/*.dmg
+          retention-days: 14

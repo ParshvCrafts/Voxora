@@ -97,6 +97,16 @@ pub fn default_rules() -> Vec<AppRule> {
     v.push(rule(Some("OUTLOOK.EXE"), None, Mode::Professional));
     v.push(rule(Some("olk.exe"), None, Mode::Professional));
     v.push(rule(Some("WINWORD.EXE"), None, Mode::Professional));
+    // macOS reports the app's display name (no window titles without Screen Recording).
+    for app in ["Code", "Cursor", "Windsurf", "Zed", "Xcode", "IntelliJ IDEA", "PyCharm"] {
+        v.push(rule(Some(app), None, Mode::Technical));
+    }
+    for app in ["Terminal", "iTerm2", "Warp", "Ghostty", "Alacritty", "WezTerm"] {
+        v.push(terminal(app, PasteKeys::CtrlV));
+    }
+    for app in ["Mail", "Microsoft Outlook", "Microsoft Word", "Pages"] {
+        v.push(rule(Some(app), None, Mode::Professional));
+    }
     v
 }
 
