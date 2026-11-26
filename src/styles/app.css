@@ -312,3 +312,7 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+.note-box { font-size: 14px; padding: 12px 16px; border-radius: 12px; background: var(--surface-2); margin-bottom: 16px; }
+.note-box.err { color: var(--red); }
+.note-box.err .muted { color: var(--text-2); }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, RefreshCw } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import { FolderOpen, Power, RefreshCw } from "lucide-react";
 import { useApp } from "../App";
 import { Item, PageHead, Range, Section, Toggle } from "../components/ui";
 import { api, IS_MAC, keyLabel, MOD } from "../lib/api";
@@ -25,11 +26,16 @@ export default function SettingsPage() {
   const { settings: s, update, status, toast } = useApp();
   const [devices, setDevices] = useState<string[]>([]);
   const [keys, setKeys] = useState<string[]>([]);
+  const [version, setVersion] = useState("");
 
   useEffect(() => {
-    api.listDevices().then(setDevices);
-    api.listKeys().then(setKeys);
+    api.listDevices().then(setDevices).catch(() => {});
+    api.listKeys().then(setKeys).catch(() => {});
+    getVersion().then(setVersion).catch(() => {});
   }, []);
+
+  const savedDevice = s.audio.device;
+  const deviceNames = [...new Set(devices)];
 
   const letter = (v: string) => v.slice(-1).toUpperCase();
 
@@ -38,7 +44,12 @@ export default function SettingsPage() {
       <PageHead title="Settings" />
 
       <Section title="Keyboard">
-        <Item name="Dictation key" help="Hold to talk, tap for hands-free. Voxora reserves this key while it runs.">
+        <Item name="Dictation key" help={
+            <>
+              Hold to talk, tap for hands-free. Voxora reserves this key while it runs.
+              {!IS_MAC && " On keyboard layouts where Right Alt is AltGr (German, French, Polish and others), pick a different key."}
+            </>
+          }>
           <select
             className="input"
             aria-label="Dictation key"
@@ -94,7 +105,10 @@ export default function SettingsPage() {
             onChange={(e) => update((x) => (x.audio.device = e.target.value || null))}
           >
             <option value="">System default</option>
-            {devices.map((d) => (
+            {savedDevice && !deviceNames.includes(savedDevice) && (
+              <option value={savedDevice}>{savedDevice} (not connected)</option>
+            )}
+            {deviceNames.map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>
@@ -237,6 +251,22 @@ export default function SettingsPage() {
           </button>
           <button className="btn" onClick={() => api.openFolder("logs")}>
             <FolderOpen size={15} /> Logs
+          </button>
+        </Item>
+      </Section>
+
+      <Section title="About">
+        <Item name={`Voxora${version ? ` ${version}` : ""}`} help="Free and open source. Everything runs on this computer.">
+          <button className="btn" onClick={() => api.quit()}>
+            <Power size={15} /> Quit Voxora
+          </button>
+        </Item>
+        <Item
+          name="Your data"
+          help={`Models, history, settings and logs live in one folder. Closing the window only hides Voxora to the ${IS_MAC ? "menu bar" : "tray"}; Quit stops it. After uninstalling, delete that folder to remove everything.`}
+        >
+          <button className="btn" onClick={() => api.openFolder("data")}>
+            <FolderOpen size={15} /> Open data folder
           </button>
         </Item>
       </Section>

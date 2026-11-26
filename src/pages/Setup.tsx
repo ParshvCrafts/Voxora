@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
 import { Check, Cpu, ShieldCheck, WifiOff } from "lucide-react";
 import { useApp } from "../App";
-import { Item, Section } from "../components/ui";
-import { api, IS_MAC, on, type SetupProgress } from "../lib/api";
+import { Item, Section, Toggle } from "../components/ui";
+import { api, IS_MAC, on, type SetupPlan, type SetupProgress } from "../lib/api";
 import logo from "../../assets/logo.svg";
 
 const GB = 1e9;
+const gb = (bytes: number) => (bytes / GB).toFixed(1);
 
 export default function Setup({ onDone }: { onDone: () => void }) {
-  const { status, toast } = useApp();
-  const [busy, setBusy] = useState(false);
+  const { status, settings, update } = useApp();
+  const [started, setStarted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Record<string, SetupProgress>>({});
+  const [plan, setPlan] = useState<SetupPlan | null>(null);
+  const busy = started || status.installing;
+
+  // The backend decides what this machine needs (GPU or CPU builds, model size); ask again when
+  // the GPU check finishes or the AI rewrite choice changes.
+  useEffect(() => {
+    api.setupPlan().then(setPlan).catch(() => {});
+  }, [status.gpu, settings.llm.enabled, settings.llm.model]);
 
   useEffect(
     () =>
@@ -22,19 +32,23 @@ export default function Setup({ onDone }: { onDone: () => void }) {
   );
 
   const start = async () => {
-    setBusy(true);
+    setStarted(true);
+    setError(null);
     try {
       await api.install();
       onDone();
     } catch (e) {
-      toast(`Setup stopped: ${e}`, true);
+      setError(String(e));
     } finally {
-      setBusy(false);
+      setStarted(false);
     }
   };
 
   const gpu = status.gpu?.split(" · ")[0] ?? (IS_MAC ? "Apple silicon" : null);
-  const size = IS_MAC ? "3.6" : gpu ? "4.7" : "1.9"; // Mac: no CUDA libraries to fetch
+  const rewriteOn = settings.llm.enabled && settings.llm.managed;
+  const total = plan ? plan.speech_bytes + (rewriteOn ? plan.rewrite_bytes : 0) : 0;
+  const rewriteBytes = plan?.rewrite_bytes ?? 0;
+  const size = total > 0 ? `about ${gb(total)} GB` : "a few GB";
 
   return (
     <div className="page" style={{ maxWidth: 600, paddingTop: 24 }}>
@@ -43,7 +57,7 @@ export default function Setup({ onDone }: { onDone: () => void }) {
         <h1 style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.025em", margin: 0 }}>Welcome to Voxora</h1>
         <p className="muted" style={{ margin: 0, maxWidth: 460 }}>
           Voxora runs entirely on this {IS_MAC ? "Mac" : "PC"}. First it downloads its open-source speech and writing
-          models, about {size} GB, once.
+          models, {size}, once.
         </p>
       </div>
 
@@ -58,6 +72,19 @@ export default function Setup({ onDone }: { onDone: () => void }) {
           <Cpu size={20} className="muted" />
         </Item>
       </Section>
+
+      {settings.llm.managed && (
+        <Section>
+          <Item
+            name={`AI rewrite${rewriteBytes > 0 ? `, ${gb(rewriteBytes)} GB` : ""}`}
+            help="Cleans up fillers and punctuation with a local language model. Speech-to-text works without it."
+          >
+            <span style={busy ? { opacity: 0.4, pointerEvents: "none" } : undefined}>
+              <Toggle label="AI rewrite" checked={settings.llm.enabled} onChange={(v) => update((x) => (x.llm.enabled = v))} />
+            </span>
+          </Item>
+        </Section>
+      )}
 
       {Object.keys(items).length > 0 && (
         <Section>
@@ -87,9 +114,18 @@ export default function Setup({ onDone }: { onDone: () => void }) {
         </Section>
       )}
 
+      {error && !busy && (
+        <div className="note-box err" role="alert">
+          <b>Setup stopped.</b> {error}
+          <div className="muted" style={{ marginTop: 4 }}>
+            Files that finished downloading are kept, and partial downloads resume where they stopped.
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "center" }}>
         <button className="btn primary lg" disabled={busy} onClick={start}>
-          {busy ? "Downloading" : "Download and start"}
+          {busy ? "Downloading" : error ? "Retry" : "Download and start"}
         </button>
       </div>
     </div>

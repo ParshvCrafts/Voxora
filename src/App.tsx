@@ -31,7 +31,7 @@ type PageId = (typeof PAGES)[number]["id"];
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [status, setStatus] = useState<Status>({ asr: "starting", llm: "starting", missing: [], paused: false, gpu: null });
+  const [status, setStatus] = useState<Status>({ asr: "starting", llm: "starting", missing: [], paused: false, gpu: null, installing: false });
   const [page, setPage] = useState<PageId>("home");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<{ msg: string; error: boolean } | null>(null);
@@ -48,7 +48,7 @@ export default function App() {
 
   useEffect(() => {
     reload();
-    const offs = [on<Status>("status", (s) => setStatus((p) => ({ ...p, ...s }))), on("settings", reload)];
+    const offs = [on<Status>("status", setStatus), on("settings", reload)];
     return () => offs.forEach((f) => f());
   }, [reload]);
 

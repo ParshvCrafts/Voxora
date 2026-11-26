@@ -4,6 +4,8 @@ import { useApp } from "../App";
 import { PageHead } from "../components/ui";
 import { api, MODES, modeLabel, on, type Dictation, type Mode } from "../lib/api";
 
+const PAGE = 200;
+
 const STATUS: Record<Dictation["status"], string> = {
   inserted: "Inserted",
   clipboard_only: "Left on clipboard",
@@ -16,10 +18,41 @@ export default function History() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Dictation[]>([]);
   const [rerun, setRerun] = useState<Record<number, string>>({});
+  const [more, setMore] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
+  // Reloads the first page; "Show more" pages are dropped, which is fine after a change or a new search.
   const load = useCallback(() => {
-    api.history(q, 200).then(setRows).catch((e) => toast(String(e), true));
+    api
+      .history(q, PAGE, 0)
+      .then((r) => {
+        setRows(r);
+        setMore(r.length === PAGE);
+      })
+      .catch((e) => toast(String(e), true));
   }, [q, toast]);
+
+  const showMore = () =>
+    api
+      .history(q, PAGE, rows.length)
+      .then((r) => {
+        setRows((prev) => [...prev, ...r.filter((d) => !prev.some((p) => p.id === d.id))]);
+        setMore(r.length === PAGE);
+      })
+      .catch((e) => toast(String(e), true));
+
+  useEffect(() => {
+    if (!confirmClear) return;
+    const t = setTimeout(() => setConfirmClear(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmClear]);
+
+  const clearAll = () => {
+    if (!confirmClear) return setConfirmClear(true);
+    setConfirmClear(false);
+    api.historyClear().then(load).catch((e) => toast(String(e), true));
+  };
+  const remove = (id: number) => api.historyDelete(id).then(load).catch((e) => toast(String(e), true));
 
   useEffect(() => {
     const t = setTimeout(load, 150);
@@ -46,9 +79,9 @@ export default function History() {
         <button
           className="btn danger"
           disabled={rows.length === 0}
-          onClick={() => confirm("Delete all history? This can't be undone.") && api.historyClear().then(load)}
+          onClick={clearAll}
         >
-          <Trash2 size={15} /> Clear all
+          <Trash2 size={15} /> {confirmClear ? "Click again to clear all" : "Clear all"}
         </button>
       </div>
 
@@ -119,7 +152,7 @@ export default function History() {
                   </select>
                 </label>
                 <span className="spacer" />
-                <button className="btn plain icon" onClick={() => api.historyDelete(d.id).then(load)} aria-label="Delete" title="Delete">
+                <button className="btn plain icon" onClick={() => remove(d.id)} aria-label="Delete" title="Delete">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -127,6 +160,13 @@ export default function History() {
           );
         })}
       </div>
+      {more && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+          <button className="btn" onClick={showMore}>
+            Show more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

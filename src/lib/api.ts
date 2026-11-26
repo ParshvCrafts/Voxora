@@ -63,6 +63,14 @@ export interface Status {
   paused: boolean;
   gpu: string | null;
   permission?: string | null;
+  /** Setup is downloading or unpacking right now. */
+  installing: boolean;
+}
+
+/** What setup still has to download on this machine, in bytes. */
+export interface SetupPlan {
+  speech_bytes: number;
+  rewrite_bytes: number;
 }
 
 export interface Stats {
@@ -94,6 +102,8 @@ export const api = {
   stats: () => invoke<Stats>("stats"),
   copyText: (text: string) => invoke<void>("copy_text", { text }),
   reprocess: (id: number, mode: Mode) => invoke<string>("reprocess", { id, mode }),
+  setupPlan: () => invoke<SetupPlan>("setup_plan"),
+  quit: () => invoke<void>("quit"),
   install: () => invoke<void>("install"),
   restartEngines: () => invoke<void>("restart_engines"),
   setPaused: (paused: boolean) => invoke<void>("set_paused", { paused }),
