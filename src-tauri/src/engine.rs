@@ -85,7 +85,6 @@ impl Paths {
 #[derive(Debug, Clone, Serialize)]
 pub struct Overlay {
     pub kind: &'static str, // listening | processing | done | notice | warning | error | hidden
-    pub mode: &'static str,
     pub message: Option<String>,
     pub hands_free: bool,
 }
@@ -218,18 +217,16 @@ impl Engine {
         crate::tray::refresh(&self.app);
     }
 
+    /// The pill shows no text except a message, so the window is only as wide as what it shows
+    /// (D16): compact for the dot and bars, wide when a message must fit.
     fn overlay(&self, kind: &'static str, message: Option<String>, hands_free: bool) {
-        let mode = self.session.lock().unwrap().as_ref().map(|s| s.profile.mode).unwrap_or(self.settings().mode);
-        self.overlay_with_mode(kind, mode, message, hands_free);
-    }
-
-    fn overlay_with_mode(&self, kind: &'static str, mode: Mode, message: Option<String>, hands_free: bool) {
         let Some(w) = self.app.get_webview_window("overlay") else { return };
-        let _ = self.app.emit_to("overlay", "overlay", Overlay { kind, mode: mode.badge(), message, hands_free });
+        let width = if message.is_some() { 340.0 } else { 184.0 };
+        let _ = self.app.emit_to("overlay", "overlay", Overlay { kind, message, hands_free });
         if kind == "hidden" {
             winutil::hide_overlay(&w);
         } else {
-            winutil::show_overlay(&w, 56);
+            winutil::show_overlay(&w, width, 64.0, 56);
         }
     }
 
@@ -338,14 +335,14 @@ impl Engine {
     fn stop_recording(self: &Arc<Self>) {
         hotkey::set_recording(false);
         let Some(session) = self.session.lock().unwrap().take() else { return };
-        self.overlay_with_mode("processing", session.profile.mode, None, false);
+        self.overlay("processing", None, false);
         let me = self.clone();
         let released = Instant::now();
         tauri::async_runtime::spawn(async move {
             let audio = me.audio.clone();
             let rec = tauri::async_runtime::spawn_blocking(move || audio.stop()).await.ok().flatten();
             let Some(rec) = rec else {
-                me.overlay_with_mode("error", session.profile.mode, Some("Recording failed".into()), false);
+                me.overlay("error", Some("Recording failed".into()), false);
                 return me.overlay_hide_after(2000);
             };
             me.process(rec, session.target, session.profile, released).await;
@@ -359,22 +356,17 @@ impl Engine {
         let t0 = released;
         let mode = profile.mode;
         if rec.speech_ms < 200 {
-            self.overlay_with_mode("notice", mode, Some("No speech detected".into()), false);
+            self.overlay("notice", Some("No speech detected".into()), false);
             return self.overlay_hide_after(900);
         }
         let s = self.settings();
         let asr = self.asr.read().unwrap().clone();
         if !asr.healthy().await {
-            self.overlay_with_mode("processing", mode, Some("Loading speech model…".into()), false);
+            self.overlay("processing", Some("Loading speech model…".into()), false);
             if let Err(e) = self.start_asr().await {
                 tracing::error!("speech engine unavailable: {e}");
                 *self.failed_audio.lock().unwrap() = Some((rec, target, profile));
-                self.overlay_with_mode(
-                    "error",
-                    mode,
-                    Some("Speech engine stopped. Restart it in Settings.".into()),
-                    false,
-                );
+                self.overlay("error", Some("Speech engine stopped. Restart it in Settings.".into()), false);
                 return self.overlay_hide_after(3500);
             }
         }
@@ -394,12 +386,7 @@ impl Engine {
                     Err(e) => {
                         tracing::error!("transcription failed after restart: {e}");
                         *self.failed_audio.lock().unwrap() = Some((rec, target, profile));
-                        self.overlay_with_mode(
-                            "error",
-                            mode,
-                            Some("Couldn't transcribe. Retry from the tray.".into()),
-                            false,
-                        );
+                        self.overlay("error", Some("Couldn't transcribe. Retry from the tray.".into()), false);
                         return self.overlay_hide_after(3500);
                     }
                 }
@@ -407,7 +394,7 @@ impl Engine {
         };
         let asr_ms = t_asr.elapsed().as_millis() as i64;
         let Some(raw) = asr_filter::clean(&text, rec.speech_ms) else {
-            self.overlay_with_mode("notice", mode, Some("No speech detected".into()), false);
+            self.overlay("notice", Some("No speech detected".into()), false);
             return self.overlay_hide_after(900);
         };
 
@@ -459,7 +446,7 @@ impl Engine {
         let _ = self.app.emit("history", ());
         match status {
             RowStatus::Inserted => {
-                self.overlay_with_mode("done", mode, None, false);
+                self.overlay("done", None, false);
                 self.overlay_hide_after(350);
             }
             _ => {
@@ -468,7 +455,7 @@ impl Engine {
                 } else {
                     format!("Copied. Paste it with {PASTE_KEYS}.")
                 };
-                self.overlay_with_mode("notice", mode, Some(msg), false);
+                self.overlay("notice", Some(msg), false);
                 self.overlay_hide_after(3000);
             }
         }
@@ -527,7 +514,7 @@ impl Engine {
             let _ = settings::save(&self.paths.settings, &s);
             s.mode
         };
-        self.overlay_with_mode("notice", mode, Some(format!("Mode: {}", mode_label(mode))), false);
+        self.overlay("notice", Some(format!("Mode: {}", mode_label(mode))), false);
         self.overlay_hide_after(1000);
         let _ = self.app.emit("settings", ());
         crate::tray::refresh(&self.app);
@@ -551,7 +538,7 @@ impl Engine {
     pub async fn retry_failed(self: &Arc<Self>) {
         let failed = self.failed_audio.lock().unwrap().take();
         if let Some((rec, target, profile)) = failed {
-            self.overlay_with_mode("processing", profile.mode, None, false);
+            self.overlay("processing", None, false);
             self.process(rec, target, profile, Instant::now()).await;
         }
     }

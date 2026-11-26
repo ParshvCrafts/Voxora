@@ -128,3 +128,13 @@ Windows kept Alt marked as held system-wide (later keys in any app arrived as Al
 key-up is swallowed only if we swallowed its key-down (tests in `hotkey.rs`). Rejected: a
 JS key-forwarding workaround from the webview (worked, but lost the first key after window
 activation and duplicated the root fix). The e2e suite now dictates into the Home "Try it" box.
+
+## D16: HUD shows no label, only the dot and bars (2026-11-26)
+Owner request: the recording pill should show only the red dot and the live waveform. The
+removed text was the mode name ("Clean", "Technical") shown while listening and processing.
+It was not the only cue for anything: a mode switch via the hotkey still shows "Mode: X" for
+a second, the tray and Settings show the current mode, and per-app profiles are visible in
+Settings. Kept: short messages for errors, warnings and notices (mic muted or unplugged, no
+speech, model loading, paste fallback), since those are the only signal something went wrong.
+The window is now sized per state (184x64 DIP for dot and bars, 340x64 when a message must
+fit) and in the target monitor's DPI, so no transparent slab is left on screen.

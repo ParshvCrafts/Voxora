@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Child;
 
 use objc2_app_kit::{NSStatusWindowLevel, NSWindow, NSWindowCollectionBehavior};
-use tauri::{PhysicalPosition, WebviewWindow};
+use tauri::{PhysicalPosition, PhysicalSize, WebviewWindow};
 
 /// AppKit objects belong to the main thread; engine code runs on worker threads.
 fn on_ns_window(w: &WebviewWindow, f: impl FnOnce(&NSWindow) + Send + 'static) {
@@ -33,18 +33,21 @@ pub fn make_overlay(w: &WebviewWindow) {
     });
 }
 
-/// Bottom-center of the screen the pointer is on. `orderFrontRegardless` shows the window
-/// without activating Voxora, so the app being dictated into keeps keyboard focus.
-pub fn show_overlay(w: &WebviewWindow, bottom_margin_px: i32) {
+/// Bottom-center of the screen the pointer is on, sized `w_pt` x `h_pt`. `orderFrontRegardless`
+/// shows the window without activating Voxora, so the app being dictated into keeps keyboard focus.
+pub fn show_overlay(w: &WebviewWindow, w_pt: f64, h_pt: f64, bottom_margin_pt: i32) {
     let monitor = w
         .cursor_position()
         .ok()
         .and_then(|p| w.monitor_from_point(p.x, p.y).ok().flatten())
         .or_else(|| w.primary_monitor().ok().flatten());
-    if let (Some(m), Ok(size)) = (monitor, w.outer_size()) {
+    if let Some(m) = monitor {
+        let scale = m.scale_factor();
+        let (width, height) = ((w_pt * scale).round() as i32, (h_pt * scale).round() as i32);
+        let _ = w.set_size(PhysicalSize::new(width as u32, height as u32));
         let area = m.work_area();
-        let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
-        let y = area.position.y + area.size.height as i32 - size.height as i32 - bottom_margin_px;
+        let x = area.position.x + (area.size.width as i32 - width) / 2;
+        let y = area.position.y + area.size.height as i32 - height - (bottom_margin_pt as f64 * scale).round() as i32;
         let _ = w.set_position(PhysicalPosition::new(x, y));
     }
     on_ns_window(w, |ns| ns.orderFrontRegardless());

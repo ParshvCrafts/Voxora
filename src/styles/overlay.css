@@ -1,5 +1,5 @@
-/* The HUD: a black capsule in the spirit of the Dynamic Island. White live bars, a red
-   recording dot, and a quiet mode label. Color appears only for warnings and errors. */
+/* The HUD: a black capsule in the spirit of the Dynamic Island. A red recording dot and white
+   live bars, no label. Color appears only for warnings and errors. */
 @import "@fontsource-variable/inter/opsz.css";
 
 :root {
@@ -28,7 +28,8 @@ body.overlay-body {
   height: 44px;
   min-width: 148px;
   max-width: 330px;
-  padding: 0 18px 0 16px;
+  justify-content: center;
+  padding: 0 16px;
   box-sizing: border-box;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.92);
@@ -78,7 +79,6 @@ body.overlay-body {
   40% { opacity: 1; }
 }
 
-.mode { margin-left: auto; color: rgba(255, 255, 255, 0.5); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ok { color: #fff; flex: none; }
 .info { color: rgba(255, 255, 255, 0.7); flex: none; }

@@ -4,16 +4,16 @@ use std::ffi::c_void;
 use std::os::windows::io::AsRawHandle;
 use std::sync::OnceLock;
 
-use windows::Win32::Foundation::{HANDLE, HWND, RECT};
+use windows::Win32::Foundation::{HANDLE, HWND};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow};
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation, SetInformationJobObject,
 };
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GWL_EXSTYLE, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect, HWND_TOPMOST, SW_HIDE, SW_SHOWNOACTIVATE,
-    SWP_NOACTIVATE, SWP_NOSIZE, SetWindowLongPtrW, SetWindowPos, ShowWindow, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT,
+    GWL_EXSTYLE, GetForegroundWindow, GetWindowLongPtrW, HWND_TOPMOST, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
 };
 
 struct Job(HANDLE);
@@ -63,20 +63,22 @@ pub fn make_overlay(w: &tauri::WebviewWindow) {
     }
 }
 
-/// Show bottom-center on the monitor the user is working on, without activating.
-pub fn show_overlay(w: &tauri::WebviewWindow, bottom_margin_px: i32) {
+/// Show bottom-center on the monitor the user is working on, sized `w_dip` x `h_dip` in that
+/// monitor's DPI, without activating.
+pub fn show_overlay(w: &tauri::WebviewWindow, w_dip: f64, h_dip: f64, bottom_margin_dip: i32) {
     let Some(hwnd) = hwnd(w) else { return };
     unsafe {
         let mon = MonitorFromWindow(GetForegroundWindow(), MONITOR_DEFAULTTONEAREST);
         let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
         if GetMonitorInfoW(mon, &mut mi).as_bool() {
-            let mut r = RECT::default();
-            let _ = GetWindowRect(hwnd, &mut r);
-            let (w, h) = (r.right - r.left, r.bottom - r.top);
+            let (mut dpi_x, mut dpi_y) = (96u32, 96u32);
+            let _ = GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
+            let scale = dpi_x as f64 / 96.0;
+            let (w, h) = ((w_dip * scale).round() as i32, (h_dip * scale).round() as i32);
             let work = mi.rcWork;
             let x = work.left + (work.right - work.left - w) / 2;
-            let y = work.bottom - h - bottom_margin_px;
-            let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+            let y = work.bottom - h - (bottom_margin_dip as f64 * scale).round() as i32;
+            let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, y, w, h, SWP_NOACTIVATE);
         }
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }

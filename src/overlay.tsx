@@ -1,5 +1,6 @@
 // The floating pill. Never takes focus (Win32 WS_EX_NOACTIVATE is set by the Rust side); it only
-// renders state pushed from the engine.
+// renders state pushed from the engine. No text except a message (D16): the dot and bars say
+// "recording", a message says what went wrong or changed.
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AlertTriangle, Check, Info, Lock, XCircle } from "lucide-react";
@@ -9,16 +10,14 @@ import "./styles/overlay.css";
 type Kind = "listening" | "processing" | "done" | "notice" | "warning" | "error" | "hidden";
 interface OverlayState {
   kind: Kind;
-  mode: string;
   message: string | null;
   hands_free: boolean;
 }
 
 const BARS = 16;
-const MODE_NAMES: Record<string, string> = { CLEAN: "Clean", TECH: "Technical", MATH: "Math", BRIEF: "Concise", PRO: "Professional", RAW: "Verbatim" };
 
 function Pill() {
-  const [state, setState] = useState<OverlayState>({ kind: "hidden", mode: "CLEAN", message: null, hands_free: false });
+  const [state, setState] = useState<OverlayState>({ kind: "hidden", message: null, hands_free: false });
   const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0));
   const latest = useRef(0);
 
@@ -61,7 +60,6 @@ function Pill() {
       {state.kind === "warning" && <AlertTriangle size={17} className="warn" />}
       {state.kind === "error" && <XCircle size={17} className="err" />}
       {state.message && <span className="msg">{state.message}</span>}
-      {!state.message && state.kind !== "done" && <span className="mode">{MODE_NAMES[state.mode] ?? state.mode}</span>}
     </div>
   );
 }
