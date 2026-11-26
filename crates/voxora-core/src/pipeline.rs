@@ -116,7 +116,7 @@ pub async fn process<R: Rewriter>(req: Request<'_>, llm: Option<&R>) -> Outcome 
 
     let words = word_count(&det);
     if words > LLM_MAX_WORDS {
-        return done(Path::FastPath);
+        return done(Path::Fallback(format!("too long to rewrite ({words} words)")));
     }
     let timeout = llm_timeout(req.timeout, words);
 
@@ -218,8 +218,8 @@ mod tests {
         let raw = format!("um {}", "the meeting moved to Wednesday and ".repeat(60));
         let llm = Fake(Ok(r#"{"text":"WRONG"}"#), 0);
         let o = process(req(&raw, Mode::Clean, &d), Some(&llm)).await;
-        assert_eq!(o.path, Path::FastPath);
-        assert!(!o.text.contains("WRONG"));
+        assert!(matches!(o.path, Path::Fallback(ref w) if w.starts_with("too long")), "{:?}", o.path);
+        assert_eq!(o.text, o.deterministic);
     }
 
     #[tokio::test]

@@ -793,9 +793,15 @@ impl Engine {
         if already {
             return Err("Setup is already running.".into());
         }
-        let result = self.install_inner().await;
-        self.set_status(|st| st.installing = false);
-        result
+        // Cleared on every exit, including a panic or a dropped future.
+        struct Done<'a>(&'a Engine);
+        impl Drop for Done<'_> {
+            fn drop(&mut self) {
+                self.0.set_status(|st| st.installing = false);
+            }
+        }
+        let _done = Done(self);
+        self.install_inner().await
     }
 
     /// What setup still has to fetch on this machine: speech parts, and the AI rewrite parts
