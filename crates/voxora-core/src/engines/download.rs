@@ -215,12 +215,26 @@ async fn fetch_into(
 
 /// Extract a runtime archive (`.zip` or `.tar.gz`) into `dir`, flattening a single top-level
 /// folder if present.
+/// All or nothing: unpack beside `dir`, then swap it in. An interrupted unpack (app quit, disk
+/// full) leaves no half-filled runtime that looks installed because its exe exists.
 pub fn extract(archive: &Path, dir: &Path) -> Result<(), String> {
-    if archive.to_string_lossy().ends_with(".tar.gz") {
-        extract_tar_gz(archive, dir)
+    let mut tmp = dir.as_os_str().to_owned();
+    tmp.push(".partial");
+    let tmp = std::path::PathBuf::from(tmp);
+    let _ = std::fs::remove_dir_all(&tmp);
+    let res = if archive.to_string_lossy().ends_with(".tar.gz") {
+        extract_tar_gz(archive, &tmp)
     } else {
-        extract_zip(archive, dir)
+        extract_zip(archive, &tmp)
+    };
+    if let Err(e) = res {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err(e);
     }
+    if dir.exists() {
+        std::fs::remove_dir_all(dir).map_err(|e| format!("cannot replace {}: {e}", dir.display()))?;
+    }
+    std::fs::rename(&tmp, dir).map_err(|e| e.to_string())
 }
 
 /// tar.gz keeps Unix modes and symlinks (llama.cpp's macOS dylibs depend on both).
@@ -365,5 +379,26 @@ mod tests {
         tar_gz(&bad, &[("x/../../evil", b"x")]);
         assert!(extract(&bad, &dir.path().join("out2")).is_err());
         assert!(!dir.path().join("evil").exists());
+    }
+
+    #[test]
+    fn extract_is_all_or_nothing() {
+        // An unpack that fails halfway must not leave a runtime folder whose exe exists but
+        // whose libraries are missing: "installed" is judged by the exe alone.
+        let dir = tempfile::tempdir().unwrap();
+        let bad = dir.path().join("bad.tar.gz");
+        tar_gz(&bad, &[("r/llama-server", b"bin"), ("r/../../evil", b"x")]);
+        let out = dir.path().join("rt");
+        assert!(extract(&bad, &out).is_err());
+        assert!(!out.exists(), "partial unpack left behind");
+
+        // A stale, broken folder from an older version is replaced, not merged into.
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(out.join("stale.dll"), b"old").unwrap();
+        let ok = dir.path().join("ok.tar.gz");
+        tar_gz(&ok, &[("r/llama-server", b"bin")]);
+        extract(&ok, &out).unwrap();
+        assert_eq!(std::fs::read(out.join("llama-server")).unwrap(), b"bin");
+        assert!(!out.join("stale.dll").exists());
     }
 }

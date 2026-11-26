@@ -89,6 +89,16 @@ pub async fn install(engine: E<'_>) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn setup_plan(engine: E<'_>) -> crate::engine::SetupPlan {
+    engine.setup_plan()
+}
+
+#[tauri::command]
+pub fn quit(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 pub fn restart_engines(engine: E<'_>) {
     engine.stop_engines();
     engine.start_engines();

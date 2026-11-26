@@ -63,6 +63,17 @@ static DISFLUENCY: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
+/// Past this, a rewrite takes longer than anyone waits; the cleaned Stage 1 text is used as is.
+pub const LLM_MAX_WORDS: usize = 300;
+
+/// The rewrite is about as long as the input, so a fixed timeout fails every long dictation
+/// (most of the owner's real fallbacks were timeouts). `base` covers ~40 words; each word
+/// past that adds 30 ms (about 1.4 tokens at the 4B model's ~60 tokens/s), capped at 10 s.
+pub fn llm_timeout(base: Duration, words: usize) -> Duration {
+    let extra = Duration::from_millis(30 * words.saturating_sub(40) as u64);
+    (base + extra).min(Duration::from_secs(10)).max(base)
+}
+
 /// Would the LLM add anything? Clean-ish modes skip it for short, fluent speech.
 pub fn needs_llm(raw: &str, mode: Mode, fast_path_words: usize) -> bool {
     if !mode.uses_llm() {
@@ -103,17 +114,23 @@ pub async fn process<R: Rewriter>(req: Request<'_>, llm: Option<&R>) -> Outcome 
         return done(Path::FastPath);
     }
 
+    let words = word_count(&det);
+    if words > LLM_MAX_WORDS {
+        return done(Path::FastPath);
+    }
+    let timeout = llm_timeout(req.timeout, words);
+
     let messages = prompts::messages(mode, &det, req.app_exe, req.terms);
     // Rewrites are about as long as the input; JSON wrapper + slack on top.
     let max_tokens = (det.len() / 3 + 48).min(2048) as u32;
     let started = Instant::now();
-    let reply = tokio::time::timeout(req.timeout, llm.complete(messages, max_tokens)).await;
+    let reply = tokio::time::timeout(timeout, llm.complete(messages, max_tokens)).await;
     let llm_ms = Some(started.elapsed().as_millis() as u64);
     let fallback =
         |why: String| Outcome { text: det.clone(), deterministic: det.clone(), path: Path::Fallback(why), llm_ms };
 
     let reply = match reply {
-        Err(_) => return fallback(format!("timeout after {} ms", req.timeout.as_millis())),
+        Err(_) => return fallback(format!("timeout after {} ms", timeout.as_millis())),
         Ok(Err(e)) => return fallback(format!("llm error: {e}")),
         Ok(Ok(r)) => r,
     };
@@ -183,6 +200,26 @@ mod tests {
         assert!(matches!(o.path, Path::Fallback(ref w) if w.starts_with("timeout")), "{:?}", o.path);
         assert_eq!(o.text, o.deterministic);
         assert!(o.text.starts_with("So we should move the sync"), "{}", o.text);
+    }
+
+    #[test]
+    fn llm_budget_grows_with_length() {
+        let base = Duration::from_millis(2500);
+        assert_eq!(llm_timeout(base, 20), base);
+        assert_eq!(llm_timeout(base, 140), Duration::from_millis(5500));
+        assert_eq!(llm_timeout(base, 300), Duration::from_secs(10));
+        // A user who set a long timeout keeps it.
+        assert_eq!(llm_timeout(Duration::from_secs(15), 10), Duration::from_secs(15));
+    }
+
+    #[tokio::test]
+    async fn very_long_dictation_skips_llm() {
+        let d = DictMatcher::new(&Dictionary::default());
+        let raw = format!("um {}", "the meeting moved to Wednesday and ".repeat(60));
+        let llm = Fake(Ok(r#"{"text":"WRONG"}"#), 0);
+        let o = process(req(&raw, Mode::Clean, &d), Some(&llm)).await;
+        assert_eq!(o.path, Path::FastPath);
+        assert!(!o.text.contains("WRONG"));
     }
 
     #[tokio::test]

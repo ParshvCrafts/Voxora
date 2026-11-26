@@ -169,6 +169,13 @@ fn run() {
             std::thread::sleep(Duration::from_millis(1500));
             continue;
         }
+        // Key events are missed while the tap is down. If the dictation key was held, its
+        // release may be among them: end the press now so `held` cannot invert the next one.
+        if let Some(s) = STATE.get()
+            && s.held.swap(false, Ordering::Relaxed)
+        {
+            (s.sink)(HotkeyEvent::Up { at_ms: now_ms() });
+        }
         let result = CGEventTap::with_enabled(
             CGEventTapLocation::HID,
             CGEventTapPlacement::HeadInsertEventTap,
@@ -267,6 +274,8 @@ pub fn set_recording(on: bool) {
 pub fn set_paused(on: bool) {
     if let Some(s) = STATE.get() {
         s.paused.store(on, Ordering::Relaxed);
+        // A release while paused is never seen; a stale `held` would invert the next press.
+        s.held.store(false, Ordering::Relaxed);
     }
 }
 

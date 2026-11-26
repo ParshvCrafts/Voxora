@@ -2,7 +2,7 @@
 //! restore the user's clipboard once the target app has read it, unless they copied something
 //! new in the meantime (checked via the clipboard sequence number).
 //!
-//! Our transient text is tagged so Windows clipboard history (Win+V) and cloud clipboard skip it.
+//! Dictated text is always tagged so Windows clipboard history (Win+V) and cloud clipboard skip it.
 
 use std::time::Duration;
 
@@ -17,7 +17,7 @@ use windows::Win32::System::Ole::CF_UNICODETEXT;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
     KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_INSERT, VK_LSHIFT,
-    VK_LWIN, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_V,
+    VK_LWIN, VK_MENU, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_V,
 };
 use windows::core::w;
 
@@ -26,11 +26,12 @@ struct ClipGuard;
 impl ClipGuard {
     /// Other apps hold the clipboard briefly all the time; retry like a polite client.
     fn open() -> Result<Self, String> {
-        for _ in 0..10 {
+        // Clipboard managers and Win+V hold it for tens of ms right after every change.
+        for _ in 0..25 {
             if unsafe { OpenClipboard(None) }.is_ok() {
                 return Ok(ClipGuard);
             }
-            std::thread::sleep(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(20));
         }
         Err("clipboard is locked by another app".into())
     }
@@ -155,6 +156,16 @@ fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
 }
 
 fn send_paste(keys: PasteKeys) -> Result<(), String> {
+    // The re-paste shortcut (Ctrl+Alt+V) fires while the user still holds Ctrl and Alt; a paste
+    // sent now would arrive as Ctrl+Alt+V. Wait for them to let go (they do within ~300 ms).
+    // Injecting an Alt key-up instead would open the menu bar in many apps.
+    for _ in 0..50 {
+        let held = |vk: VIRTUAL_KEY| unsafe { GetAsyncKeyState(vk.0 as i32) } < 0;
+        if !held(VK_MENU) && !held(VK_CONTROL) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
     let mut inputs = Vec::new();
     // A physically held Shift/Win would turn Ctrl+V into something else.
     for vk in [VK_LSHIFT, VK_RSHIFT, VK_SHIFT, VK_LWIN, VK_RWIN] {
@@ -184,8 +195,13 @@ pub struct PasteOptions {
 
 /// Paste `text` into the focused window. On error the text is still on the clipboard.
 pub fn paste(text: &str, opts: &PasteOptions) -> Result<(), String> {
-    let saved = if opts.restore_clipboard { snapshot().ok() } else { None };
-    let seq = set_text(text, opts.restore_clipboard)?;
+    let saved = if opts.restore_clipboard {
+        snapshot().inspect_err(|e| tracing::warn!("clipboard not saved, it will not be restored: {e}")).ok()
+    } else {
+        None
+    };
+    // Always tagged: hiding dictated text from clipboard history does not stop Ctrl+V.
+    let seq = set_text(text, true)?;
     send_paste(opts.keys)?;
     if let Some(saved) = saved {
         let delay = opts.restore_delay_ms;

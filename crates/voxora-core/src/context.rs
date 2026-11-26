@@ -119,18 +119,21 @@ fn matches(r: &AppRule, ctx: &AppContext) -> bool {
     exe_ok && title_ok
 }
 
-/// First matching rule wins. `auto` off = always the user's chosen mode.
+/// The first matching rule picks the mode. Paste keys and the trailing period come from the
+/// first matching rule that sets them, so a title rule ("Claude") cannot hide what a terminal
+/// rule says about how to paste. `auto` off = always the user's chosen mode.
 pub fn resolve(ctx: &AppContext, rules: &[AppRule], chosen: Mode, auto: bool) -> Profile {
-    let hit = rules.iter().find(|r| matches(r, ctx));
-    let mode = match (auto, hit) {
+    let mut hits = rules.iter().filter(|r| matches(r, ctx));
+    let first = hits.clone().next();
+    let mode = match (auto, first) {
         // A manual Verbatim choice is a deliberate "don't touch my words": never override it.
         (true, Some(r)) if chosen != Mode::Verbatim => r.mode,
         _ => chosen,
     };
     Profile {
         mode,
-        paste: hit.and_then(|r| r.paste).unwrap_or_default(),
-        terminal_period: hit.and_then(|r| r.terminal_period).unwrap_or(true),
+        paste: hits.clone().find_map(|r| r.paste).unwrap_or_default(),
+        terminal_period: hits.find_map(|r| r.terminal_period).unwrap_or(true),
     }
 }
 
@@ -161,6 +164,17 @@ mod tests {
         assert_eq!((p.mode, p.paste, p.terminal_period), (Mode::Concise, PasteKeys::CtrlV, true));
         assert_eq!(resolve(&ctx("Code.exe", ""), &r, Mode::Clean, false).mode, Mode::Clean);
         assert_eq!(resolve(&ctx("Code.exe", ""), &r, Mode::Verbatim, true).mode, Mode::Verbatim);
+    }
+
+    #[test]
+    fn title_rule_does_not_hide_terminal_paste_keys() {
+        // Claude Code in mintty: the "Claude" title rule sets the mode, but mintty still needs
+        // Shift+Insert and no trailing period, or nothing gets pasted.
+        let r = default_rules();
+        let p = resolve(&ctx("mintty.exe", "Claude Code - ~/proj"), &r, Mode::Clean, true);
+        assert_eq!((p.mode, p.paste, p.terminal_period), (Mode::Technical, PasteKeys::ShiftInsert, false));
+        let p = resolve(&ctx("wezterm-gui.exe", "GitHub CLI"), &r, Mode::Clean, false);
+        assert_eq!((p.mode, p.paste, p.terminal_period), (Mode::Clean, PasteKeys::CtrlShiftV, false));
     }
 
     #[test]

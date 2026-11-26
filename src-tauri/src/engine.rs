@@ -20,7 +20,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use voxora_core::asr_filter;
 use voxora_core::context::{AppContext, Profile, resolve};
-use voxora_core::engines::download::{self, Kind};
+use voxora_core::engines::download::{self, Asset, Kind};
 use voxora_core::engines::llm::OpenAiCompat;
 use voxora_core::engines::sidecar::{Sidecar, Spec};
 use voxora_core::engines::whisper::{WhisperClient, vocabulary_prompt};
@@ -89,7 +89,13 @@ pub struct Overlay {
     pub hands_free: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize)]
+pub struct SetupPlan {
+    pub speech_bytes: u64,
+    pub rewrite_bytes: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct EngineStatus {
     pub asr: String,
     pub llm: String,
@@ -98,6 +104,8 @@ pub struct EngineStatus {
     pub gpu: Option<String>,
     /// macOS: what permission is missing, in words for the UI. Always None on Windows.
     pub permission: Option<&'static str>,
+    /// Setup is downloading or unpacking; the UI must not start a second one.
+    pub installing: bool,
 }
 
 pub enum Msg {
@@ -128,6 +136,8 @@ pub struct Engine {
     llm: RwLock<OpenAiCompat>,
     status: Mutex<EngineStatus>,
     inject_lock: tokio::sync::Mutex<()>,
+    /// Dictations are transcribed and pasted in the order they were spoken (tokio's Mutex is FIFO).
+    process_lock: tokio::sync::Mutex<()>,
     restarting_llm: AtomicBool,
     /// Last recording whose transcription failed, kept in RAM for "Retry".
     failed_audio: Mutex<Option<(Recording, Target, Profile)>>,
@@ -173,6 +183,7 @@ impl Engine {
             session: Mutex::new(None),
             session_seq: AtomicU64::new(0),
             inject_lock: tokio::sync::Mutex::new(()),
+            process_lock: tokio::sync::Mutex::new(()),
             restarting_llm: AtomicBool::new(false),
             failed_audio: Mutex::new(None),
             audio,
@@ -208,12 +219,9 @@ impl Engine {
     }
 
     fn set_status(&self, f: impl FnOnce(&mut EngineStatus)) {
-        let snapshot = {
-            let mut s = self.status.lock().unwrap();
-            f(&mut s);
-            s.clone()
-        };
-        let _ = self.app.emit("status", snapshot);
+        f(&mut self.status.lock().unwrap());
+        // The full status: `missing`, `paused` and `permission` are computed, not stored.
+        let _ = self.app.emit("status", self.status());
         crate::tray::refresh(&self.app);
     }
 
@@ -270,9 +278,9 @@ impl Engine {
                 return;
             }
             Msg::Audio(audio::Event::StreamError(e)) => {
+                // Keep what was said before the mic dropped: stop and transcribe, don't cancel.
                 tracing::error!("microphone stream error: {e}");
-                self.overlay("error", Some("Microphone disconnected".into()), false);
-                Input::Cancel
+                Input::MaxDuration
             }
             Msg::MaxDuration(id) => {
                 if self.session.lock().unwrap().as_ref().is_none_or(|s| s.id != id) {
@@ -353,6 +361,7 @@ impl Engine {
 
     /// `released` = when the user let go of the key: `total_ms` is the latency they feel.
     async fn process(self: &Arc<Self>, rec: Recording, target: Target, profile: Profile, released: Instant) {
+        let _in_order = self.process_lock.lock().await;
         let t0 = released;
         let mode = profile.mode;
         if rec.speech_ms < 200 {
@@ -423,7 +432,9 @@ impl Engine {
         )
         .await;
         if let Path::Fallback(why) = &outcome.path {
-            tracing::warn!("rewrite fallback: {why}");
+            // Guard messages quote the user's words; logs keep only the kind (history has the text).
+            let kind = if why.starts_with("guard") { "guard rejected the rewrite" } else { why.as_str() };
+            tracing::warn!("rewrite fallback: {kind}");
             if why.starts_with("llm error") || why.starts_with("timeout") {
                 self.heal_llm();
             }
@@ -444,10 +455,22 @@ impl Engine {
             let _ = self.store(|st| st.set_status(id, status, Some(inject_ms), Some(total), err.as_deref()));
         }
         let _ = self.app.emit("history", ());
+        if self.session.lock().unwrap().is_some() && status != RowStatus::Failed {
+            return; // the user is already dictating again: keep the pill on "listening"
+        }
         match status {
             RowStatus::Inserted => {
                 self.overlay("done", None, false);
                 self.overlay_hide_after(350);
+            }
+            RowStatus::Failed => {
+                let msg = if s.history.enabled {
+                    "Couldn't paste or copy. The text is in History."
+                } else {
+                    "Couldn't paste or copy: the clipboard is busy."
+                };
+                self.overlay("error", Some(msg.into()), false);
+                self.overlay_hide_after(3500);
             }
             _ => {
                 let msg = if target.ctx.elevated {
@@ -477,7 +500,7 @@ impl Engine {
         let elevated = now.as_ref().map(|t| t.ctx.elevated).unwrap_or(ctx.elevated);
         let ms = || t.elapsed().as_millis() as i64;
         if elevated || now.is_none() {
-            return match inject::set_text(text, false) {
+            return match inject::set_text(text, true) {
                 Ok(_) => (RowStatus::ClipboardOnly, ms(), Some(BLOCKED_REASON.into())),
                 Err(e) => (RowStatus::Failed, ms(), Some(e)),
             };
@@ -490,19 +513,18 @@ impl Engine {
         };
         let text = text.to_string();
         let res = tauri::async_runtime::spawn_blocking(move || {
-            let r = inject::paste(&text, &opts);
-            if r.is_err() {
-                let _ = inject::set_text(&text, false);
-            }
-            r
+            inject::paste(&text, &opts).map_err(|e| {
+                let copied = inject::set_text(&text, true).is_ok();
+                (e, copied)
+            })
         })
         .await
-        .unwrap_or_else(|e| Err(e.to_string()));
+        .unwrap_or_else(|e| Err((e.to_string(), false)));
         match res {
             Ok(()) => (RowStatus::Inserted, ms(), None),
-            Err(e) => {
-                tracing::warn!("paste failed: {e}");
-                (RowStatus::ClipboardOnly, ms(), Some(e))
+            Err((e, copied)) => {
+                tracing::warn!("paste failed: {e} (text on clipboard: {copied})");
+                (if copied { RowStatus::ClipboardOnly } else { RowStatus::Failed }, ms(), Some(e))
             }
         }
     }
@@ -579,7 +601,9 @@ impl Engine {
         settings::save(&self.paths.settings, &new).map_err(|e| format!("could not save settings: {e}"))?;
         *self.dict.write().unwrap() = Arc::new(DictMatcher::new(&new.dictionary));
         hotkey::configure(&new.hotkey.dictation_key, new.hotkey.cycle_mode_key, new.hotkey.repaste_key);
-        *self.gesture.lock().unwrap() = Gesture::new(new.hotkey.hold_threshold_ms);
+        // Only the threshold: resetting the gesture mid-dictation would orphan the recording
+        // (mic left open, key release ignored).
+        self.gesture.lock().unwrap().hold_threshold_ms = new.hotkey.hold_threshold_ms;
         *self.llm.write().unwrap() = OpenAiCompat::new(&llm_endpoint(&new), &new.llm.model);
         *self.settings.write().unwrap() = new.clone();
         crate::autostart_sync(&self.app, new.autostart);
@@ -761,36 +785,80 @@ impl Engine {
 
     // ───────────────────────── setup ─────────────────────────
 
-    /// Download + verify + unpack everything the current settings need.
+    /// Download + verify + unpack everything the current settings need. One at a time: a second
+    /// run would write the same `.part` files.
     pub async fn install(self: &Arc<Self>) -> Result<(), String> {
-        let gpu = self.status.lock().unwrap().gpu.is_some();
-        if !gpu && self.settings().llm.model.contains("4B") {
-            // A 4B model on CPU would miss the rewrite timeout most of the time.
-            let mut s = self.settings();
-            s.llm.model = "Qwen3.5-2B-Q4_K_M.gguf".into();
-            self.update_settings(s)?;
+        let mut already = false;
+        self.set_status(|st| already = std::mem::replace(&mut st.installing, true));
+        if already {
+            return Err("Setup is already running.".into());
         }
-        let s = self.settings();
+        let result = self.install_inner().await;
+        self.set_status(|st| st.installing = false);
+        result
+    }
+
+    /// What setup still has to fetch on this machine: speech parts, and the AI rewrite parts
+    /// (listed even when the rewrite is off, so the UI can show what turning it on costs).
+    fn setup_todo(&self) -> (Vec<&'static Asset>, Vec<&'static Asset>) {
+        let gpu = self.status.lock().unwrap().gpu.is_some();
+        // A 4B model on CPU would miss the rewrite timeout most of the time; install switches to 2B.
+        let small = !gpu || self.settings().llm.model.contains("2B");
         #[cfg(windows)]
         let (whisper_rt, llama_rt) =
             (Some(if gpu { "whisper-cuda" } else { "whisper-cpu" }), if gpu { "llama-cuda" } else { "llama-cpu" });
         #[cfg(target_os = "macos")]
         let (whisper_rt, llama_rt) = (None::<&str>, "llama-macos"); // whisper-server ships in the app bundle
-        let mut ids: Vec<&str> = whisper_rt.into_iter().collect();
-        ids.extend(["silero-vad", "whisper-large-v3-turbo-q8"]);
-        if s.llm.enabled && s.llm.managed {
-            ids.push(llama_rt);
-            ids.push(if s.llm.model.contains("2B") { "qwen3.5-2b" } else { "qwen3.5-4b" });
+        let mut speech: Vec<&str> = whisper_rt.into_iter().collect();
+        speech.extend(["silero-vad", "whisper-large-v3-turbo-q8"]);
+        let rewrite = [llama_rt, if small { "qwen3.5-2b" } else { "qwen3.5-4b" }];
+        let missing = |ids: &[&str]| -> Vec<&'static Asset> {
+            ids.iter()
+                .filter_map(|id| download::asset(id))
+                .filter(|a| match a.kind {
+                    Kind::Model => !self.paths.models.join(a.file).exists(),
+                    Kind::Runtime => !self.paths.runtime.join(runtime_dir(a.id)).join(runtime_exe(a.id)).exists(),
+                })
+                .collect()
+        };
+        (missing(&speech), missing(&rewrite))
+    }
+
+    pub fn setup_plan(&self) -> SetupPlan {
+        let (speech, rewrite) = self.setup_todo();
+        let sum = |v: &[&Asset]| v.iter().map(|a| a.bytes).sum();
+        SetupPlan { speech_bytes: sum(&speech), rewrite_bytes: sum(&rewrite) }
+    }
+
+    async fn install_inner(self: &Arc<Self>) -> Result<(), String> {
+        let gpu = self.status.lock().unwrap().gpu.is_some();
+        if !gpu && self.settings().llm.model.contains("4B") {
+            let mut s = self.settings();
+            s.llm.model = "Qwen3.5-2B-Q4_K_M.gguf".into();
+            self.update_settings(s)?;
         }
-        for id in ids {
-            let a = download::asset(id).ok_or(format!("unknown asset {id}"))?;
-            let installed = match a.kind {
-                Kind::Model => self.paths.models.join(a.file).exists(),
-                Kind::Runtime => self.paths.runtime.join(runtime_dir(id)).join(runtime_exe(id)).exists(),
-            };
-            if installed {
-                continue;
-            }
+        let s = self.settings();
+        let (mut todo, rewrite) = self.setup_todo();
+        if s.llm.enabled && s.llm.managed {
+            todo.extend(rewrite);
+        }
+        // Fail up front with a clear message instead of an OS error gigabytes in. A runtime
+        // archive and its unpacked copy exist side by side for a moment, hence 3x.
+        let need: u64 = todo.iter().map(|a| if a.kind == Kind::Runtime { a.bytes * 3 } else { a.bytes }).sum();
+        let _ = std::fs::create_dir_all(&self.paths.root);
+        if let Ok(free) = fs4::available_space(&self.paths.root)
+            && free < need + 200_000_000
+        {
+            let gb = |b: u64| b as f64 / 1e9;
+            return Err(format!(
+                "Not enough disk space: setup needs about {:.1} GB free on the drive holding {}, and {:.1} GB is free.",
+                gb(need + 200_000_000),
+                self.paths.root.display(),
+                gb(free)
+            ));
+        }
+        for a in todo {
+            let id = a.id;
             let dest = match a.kind {
                 Kind::Model => self.paths.models.join(a.file),
                 Kind::Runtime => self.paths.cache.join(a.file),
@@ -970,6 +1038,12 @@ fn validate(s: &Settings) -> Result<(), String> {
     }
     if !s.hotkey.cycle_mode_key.is_ascii_alphanumeric() || !s.hotkey.repaste_key.is_ascii_alphanumeric() {
         return Err("Shortcut keys must be a letter or digit".into());
+    }
+    if s.hotkey.cycle_mode_key.eq_ignore_ascii_case(&s.hotkey.repaste_key) {
+        return Err("The mode and re-paste shortcuts need different letters".into());
+    }
+    if !(10..=3600).contains(&s.audio.max_recording_secs) {
+        return Err("Maximum recording length must be between 10 and 3600 seconds".into());
     }
     Ok(())
 }

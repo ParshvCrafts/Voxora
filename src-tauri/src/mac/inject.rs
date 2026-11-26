@@ -105,8 +105,13 @@ pub struct PasteOptions {
 
 /// Paste `text` into the focused app. On error the text is still on the pasteboard.
 pub fn paste(text: &str, opts: &PasteOptions) -> Result<(), String> {
-    let saved = if opts.restore_clipboard { snapshot().ok() } else { None };
-    let seq = set_text(text, opts.restore_clipboard)?;
+    let saved = if opts.restore_clipboard {
+        snapshot().inspect_err(|e| tracing::warn!("clipboard not saved, it will not be restored: {e}")).ok()
+    } else {
+        None
+    };
+    // Always marked transient: clipboard managers skip it, Command+V still works.
+    let seq = set_text(text, true)?;
     std::thread::sleep(Duration::from_millis(20)); // let the pasteboard server settle
     send_paste()?;
     if let Some(saved) = saved {

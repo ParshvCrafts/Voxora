@@ -132,6 +132,8 @@ pub fn run() {
             commands::set_paused,
             commands::open_folder,
             commands::request_permission,
+            commands::quit,
+            commands::setup_plan,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Voxora")
