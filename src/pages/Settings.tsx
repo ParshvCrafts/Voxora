@@ -139,6 +139,9 @@ export default function SettingsPage() {
         <Item name="Use the GPU" help={status.gpu ?? (IS_MAC ? "Uses Apple silicon through Metal." : "No NVIDIA GPU found, so the CPU is used.")}>
           <Toggle label="Use the GPU" checked={s.asr.use_gpu} onChange={(v) => update((x) => (x.asr.use_gpu = v))} />
         </Item>
+        <Item name="Show words while you speak" help="The pill shows what it hears so far. The pasted text is still cleaned up after you let go.">
+          <Toggle label="Show words while you speak" checked={s.asr.live_preview} onChange={(v) => update((x) => (x.asr.live_preview = v))} />
+        </Item>
         <Item name="AI rewrite" help="When off, only the instant rule-based cleanup runs: fillers, punctuation, math and your dictionary.">
           <Toggle label="AI rewrite" checked={s.llm.enabled} onChange={(v) => update((x) => (x.llm.enabled = v))} />
         </Item>

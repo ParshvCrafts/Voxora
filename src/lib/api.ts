@@ -21,7 +21,7 @@ export interface Settings {
   app_rules: AppRule[];
   dictionary: { terms: string[]; replacements: { from: string; to: string }[] };
   spoken_commands: boolean;
-  asr: { model: string; language: string; port: number; use_gpu: boolean };
+  asr: { model: string; language: string; port: number; use_gpu: boolean; live_preview: boolean };
   llm: {
     enabled: boolean;
     managed: boolean;

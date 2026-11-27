@@ -162,3 +162,22 @@ candidates through `bench_eval` first, and each take was kept only if the pasted
 Speech is jump-cut for length (labelled "trimmed"); key release to paste is never cut or sped up.
 No voiceover (feeds play muted; ElevenLabs' free tier is non-commercial with a required credit).
 Music: Kevin MacLeod, "Wallpaper", CC BY 4.0. Source and steps: `video/README.md`.
+
+## D19: Live preview in the HUD, not live typing into the app (2026-11-27)
+Owner asked for Win+H style feedback: see the words while speaking. Options: (a) type partial
+text into the focused app and replace it with the final text, (b) show partial text in the HUD.
+(a) is how Win+H works, but Win+H is an input method: Windows' Text Services Framework lets it
+write uncommitted "composition" text that every app understands. Voxora pastes through the
+clipboard, so replacing partial text means selecting and overwriting it in arbitrary apps,
+which breaks in terminals, chat boxes that send on Enter, editors with autocomplete, and undo
+history, and leaves half-sentences behind if anything fails. Chose (b): while recording, the
+last 10 s of audio is re-transcribed every 450 ms and the HUD widens to show the newest words
+(raw Whisper text, fading out on the left). What gets pasted is unchanged: the full recording,
+rules and rewrite after release. Display only, never logged; setting "Show words while you
+speak" (on by default). Cost: whisper-server runs one request at a time, so a preview decode
+in flight at release delays the real one. Measured in the release build (8 dictations into
+Chrome, RTX 4060 laptop, 25 s window at the time): ASR 166 to 179 ms on most 6.5 s clips and
+292 to 520 ms on 14 to 15 s clips, against a 175/257 ms P50/P95 benchmark without previews;
+the window is now 10 s to shorten each decode. Previews stop for a dictation if one takes over
+700 ms (CPU engines). E2E 9/9 with previews on. A real in-place composition (TSF text service)
+is on the roadmap.

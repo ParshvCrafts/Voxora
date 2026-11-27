@@ -21,6 +21,9 @@ to help with one? Comment on its issue, or open one if it has none yet.
   are English-only today.
 - **Opt-in update check.** One request to GitHub's releases API, off by default, so Voxora stays
   offline unless asked.
+- **Live text in the app itself (like Win+H).** Today the live preview is in the HUD (D19).
+  Writing uncommitted text straight into the focused app needs a Text Services Framework text
+  service on Windows and an input method on macOS.
 - **Microphone level meter in Settings**, so a wrong or muted mic is obvious before dictating.
 
 ## Good first issues

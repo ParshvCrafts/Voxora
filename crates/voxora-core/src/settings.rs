@@ -104,11 +104,20 @@ pub struct AsrSettings {
     pub language: String,
     pub port: u16,
     pub use_gpu: bool,
+    /// Show the words in the HUD while recording (D19). Display only; the pasted text always
+    /// comes from the full recording.
+    pub live_preview: bool,
 }
 
 impl Default for AsrSettings {
     fn default() -> Self {
-        Self { model: "ggml-large-v3-turbo-q8_0.bin".into(), language: "en".into(), port: 18181, use_gpu: true }
+        Self {
+            model: "ggml-large-v3-turbo-q8_0.bin".into(),
+            language: "en".into(),
+            port: 18181,
+            use_gpu: true,
+            live_preview: true,
+        }
     }
 }
 
@@ -261,6 +270,15 @@ mod tests {
         std::fs::write(&p, r#"{"mode":"concise","llm":{"timeout_ms":900}}"#).unwrap();
         let s = load(&p).settings();
         assert_eq!((s.mode, s.llm.timeout_ms, s.llm.port), (Mode::Concise, 900, 18080));
+    }
+
+    #[test]
+    fn settings_from_before_live_preview_turn_it_on() {
+        // A v0.2.3 file has an `asr` block without `live_preview`; it must not come back false.
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        std::fs::write(&p, r#"{"asr":{"model":"m.bin","language":"en","port":18181,"use_gpu":false}}"#).unwrap();
+        assert!(matches!(load(&p), LoadOutcome::Loaded(s) if s.asr.live_preview && !s.asr.use_gpu));
     }
 
     #[test]

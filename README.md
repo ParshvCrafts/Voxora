@@ -36,6 +36,9 @@ sources and where they are ahead: [docs/COMPARISON.md](docs/COMPARISON.md).
 - **One key, two gestures.** Hold Right Alt (Right Option on a Mac) to talk; tap it to keep
   listening hands-free until you pause. `Esc` cancels. The floating HUD never takes focus away
   from the app you're typing in.
+- **See your words as you speak.** The HUD shows what it hears so far, then the cleaned-up text
+  is pasted when you let go. The preview is only a preview: the final text always comes from
+  the whole recording.
 - **Modes that follow the app.** Clean, Technical, Math/LaTeX, Concise, Professional,
   Verbatim. VS Code and Cursor switch to Technical, Overleaf to Math, Mail and Outlook to
   Professional, using only the app's name (and, on Windows, its window title).
@@ -183,7 +186,7 @@ Models and runtimes are not in the repo; the app downloads them on first run int
 ## Status
 
 Verified:
-- 87 unit tests on Windows, and the same core suite plus macOS key-map tests on macOS (text
+- 88 unit tests on Windows, and the same core suite plus macOS key-map tests on macOS (text
   pipeline, golden-case rules, math parser, guard, storage, gesture timing, resampling, archive
   safety), plus an opt-in live clipboard round-trip test on Windows (`cargo test -- --ignored`).
 - Windows, on the hardware above: `scripts/e2e.ps1` drives the real app through a virtual audio

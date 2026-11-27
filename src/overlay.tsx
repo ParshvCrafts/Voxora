@@ -1,6 +1,7 @@
 // The floating pill. Never takes focus (Win32 WS_EX_NOACTIVATE is set by the Rust side); it only
-// renders state pushed from the engine. No text except a message (D16): the dot and bars say
-// "recording", a message says what went wrong or changed.
+// renders state pushed from the engine. The dot and bars say "recording", a message says what
+// went wrong or changed (D16), and while recording the live preview shows the words heard so far
+// (D19). Those are a preview only: the pasted text comes from the full recording.
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AlertTriangle, Check, Info, Lock, XCircle } from "lucide-react";
@@ -19,12 +20,17 @@ const BARS = 16;
 function Pill() {
   const [state, setState] = useState<OverlayState>({ kind: "hidden", message: null, hands_free: false });
   const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0));
+  const [partial, setPartial] = useState("");
   const latest = useRef(0);
 
   useEffect(() => on<OverlayState>("overlay", (s) => {
     setState(s);
-    if (s.kind === "listening" && !s.hands_free) setLevels(Array(BARS).fill(0));
+    if (s.kind === "listening" && !s.hands_free) {
+      setLevels(Array(BARS).fill(0));
+      setPartial("");
+    }
   }), []);
+  useEffect(() => on<string>("partial", setPartial), []);
   useEffect(() => on<number>("level", (l) => (latest.current = l)), []);
 
   // Sample the latest level at a steady 30 fps so the bars scroll smoothly.
@@ -35,8 +41,9 @@ function Pill() {
   }, [state.kind]);
 
   const visible = state.kind !== "hidden";
+  const live = state.kind === "listening" && partial !== "";
   return (
-    <div className={`pill ${visible ? "in" : "out"} ${state.kind}`} role="status" aria-live="polite">
+    <div className={`pill ${visible ? "in" : "out"} ${state.kind} ${live ? "wide" : ""}`} role="status" aria-live="polite">
       {state.kind === "listening" && (
         <>
           <span className="rec" />
@@ -46,6 +53,12 @@ function Pill() {
               <span key={i} style={{ height: `${Math.max(3, Math.min(22, 3 + l * 26))}px`, opacity: 0.45 + Math.min(0.55, l) }} />
             ))}
           </span>
+          {/* Right-aligned in a clipped box: the newest words stay in view, older ones fade out left. */}
+          {live && (
+            <span className="live" aria-label="heard so far">
+              <span>{partial}</span>
+            </span>
+          )}
         </>
       )}
       {state.kind === "processing" && (

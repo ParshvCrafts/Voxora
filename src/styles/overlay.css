@@ -79,6 +79,21 @@ body.overlay-body {
   40% { opacity: 1; }
 }
 
+.pill.wide { max-width: 500px; width: 500px; justify-content: flex-start; }
+.pill.wide .bars span { max-height: 16px; }
+.live {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  overflow: hidden;
+  white-space: nowrap;
+  color: rgba(245, 245, 247, 0.82);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 36px);
+  mask-image: linear-gradient(to right, transparent 0, #000 36px);
+}
+.live span { flex: none; }
+
 .msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ok { color: #fff; flex: none; }
 .info { color: rgba(255, 255, 255, 0.7); flex: none; }

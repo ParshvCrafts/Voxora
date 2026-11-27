@@ -1,0 +1,96 @@
+[
+ {
+  "id": "p1",
+  "category": "demo",
+  "mode": "clean",
+  "spoken": "Hey, um, can you write me a Python script that renames every photo in a folder by the date it was taken, actually no, by the date in the file name, and, uh, skip anything that isn't a JPEG.",
+  "target": "Hey, um, can you write me a Python script that renames every photo in a folder by the date it was taken, actually no, by the date in the file name, and, uh, skip anything that isn't a JPEG.",
+  "expect": [
+   "Python",
+   "file name",
+   "JPEG"
+  ],
+  "forbid": [
+   "um",
+   "uh",
+   "taken"
+  ]
+ },
+ {
+  "id": "p2",
+  "category": "demo",
+  "mode": "clean",
+  "spoken": "Okay so, um, I need a cover letter for a data science internship. Keep it under two hundred words, mention my PyTorch project, and make it sound confident but not, like, arrogant.",
+  "target": "Okay so, um, I need a cover letter for a data science internship. Keep it under two hundred words, mention my PyTorch project, and make it sound confident but not, like, arrogant.",
+  "expect": [
+   "cover letter",
+   "200",
+   "PyTorch"
+  ],
+  "forbid": [
+   "um",
+   "like,"
+  ]
+ },
+ {
+  "id": "p3",
+  "category": "demo",
+  "mode": "clean",
+  "spoken": "So I'm getting this error, uh, CUDA out of memory, on batch size sixty four, can you explain why, and like, give me three ways to fix it without buying a new GPU?",
+  "target": "So I'm getting this error, uh, CUDA out of memory, on batch size sixty four, can you explain why, and like, give me three ways to fix it without buying a new GPU?",
+  "expect": [
+   "CUDA",
+   "64",
+   "GPU"
+  ],
+  "forbid": [
+   "uh",
+   "like,"
+  ]
+ },
+ {
+  "id": "m1",
+  "category": "demo",
+  "mode": "math",
+  "spoken": "integral from zero to one of x squared d x",
+  "target": "integral from zero to one of x squared d x",
+  "expect": [
+   "\\int"
+  ],
+  "forbid": []
+ },
+ {
+  "id": "m2",
+  "category": "demo",
+  "mode": "math",
+  "spoken": "sum from i equals one to n of x sub i squared",
+  "target": "sum from i equals one to n of x sub i squared",
+  "expect": [
+   "\\sum"
+  ],
+  "forbid": []
+ },
+ {
+  "id": "m3",
+  "category": "demo",
+  "mode": "math",
+  "spoken": "e to the i pi plus one equals zero",
+  "target": "e to the i pi plus one equals zero",
+  "expect": [
+   "\\pi"
+  ],
+  "forbid": []
+ },
+ {
+  "id": "m4",
+  "category": "demo",
+  "mode": "math",
+  "spoken": "the fraction a plus b over two is greater than or equal to the square root of a b",
+  "target": "the fraction a plus b over two is greater than or equal to the square root of a b",
+  "expect": [
+   "\\frac",
+   "\\sqrt"
+  ],
+  "forbid": []
+ }
+]

@@ -39,8 +39,19 @@ pub struct Recording {
 }
 
 enum Cmd {
-    Start { device: Option<String>, silence_ms: u32, reply: mpsc::Sender<Result<(), String>> },
-    Stop { reply: mpsc::Sender<Recording> },
+    Start {
+        device: Option<String>,
+        silence_ms: u32,
+        reply: mpsc::Sender<Result<(), String>>,
+    },
+    Stop {
+        reply: mpsc::Sender<Recording>,
+    },
+    /// The last `secs` of the recording so far, at 16 kHz, plus voiced ms; the stream keeps going.
+    Peek {
+        secs: u32,
+        reply: mpsc::Sender<Option<(Vec<f32>, u32)>>,
+    },
     Cancel,
 }
 
@@ -91,6 +102,13 @@ impl Audio {
         rx.recv_timeout(Duration::from_secs(5)).ok()
     }
 
+    /// For the live preview: a copy of the recent audio while recording continues.
+    pub fn peek(&self, secs: u32) -> Option<(Vec<f32>, u32)> {
+        let (reply, rx) = mpsc::channel();
+        self.tx.send(Cmd::Peek { secs, reply }).ok()?;
+        rx.recv_timeout(Duration::from_secs(2)).ok().flatten()
+    }
+
     pub fn cancel(&self) {
         let _ = self.tx.send(Cmd::Cancel);
     }
@@ -126,6 +144,15 @@ fn audio_thread(rx: mpsc::Receiver<Cmd>, on_event: impl Fn(Event) + Send + Sync 
                     duration_ms: started.elapsed().as_millis() as u32,
                     samples,
                 });
+            }
+            Cmd::Peek { secs, reply } => {
+                let snap = active.as_ref().map(|(_, shared, _)| {
+                    let s = shared.lock().unwrap();
+                    let n = s.native_rate as usize * secs as usize;
+                    (s.native[s.native.len().saturating_sub(n)..].to_vec(), s.native_rate, s.speech_frames * 16)
+                });
+                // Resample outside the lock so the capture callback never waits on it.
+                let _ = reply.send(snap.map(|(tail, rate, speech_ms)| (resample_to_16k(&tail, rate), speech_ms)));
             }
             Cmd::Cancel => active = None,
         }

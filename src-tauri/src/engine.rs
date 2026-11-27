@@ -37,6 +37,13 @@ use crate::inject::{self, PasteOptions};
 use crate::target::{self, Target};
 use crate::winutil;
 
+/// Live preview (D19): how often to re-transcribe, how much recent audio, and the ASR time above
+/// which previews stop for the dictation (CPU engines), in ms / s / ms.
+const PREVIEW_EVERY_MS: u64 = 450;
+const PREVIEW_WINDOW_SECS: u32 = 10;
+const PREVIEW_MAX_ASR_MS: u64 = 700;
+const PREVIEW_WIDTH: f64 = 520.0;
+
 pub struct Paths {
     pub root: PathBuf,
     pub models: PathBuf,
@@ -139,6 +146,8 @@ pub struct Engine {
     /// Dictations are transcribed and pasted in the order they were spoken (tokio's Mutex is FIFO).
     process_lock: tokio::sync::Mutex<()>,
     restarting_llm: AtomicBool,
+    /// The live preview has words to show this session, so the pill is wide (D19).
+    preview_wide: AtomicBool,
     /// Last recording whose transcription failed, kept in RAM for "Retry".
     failed_audio: Mutex<Option<(Recording, Target, Profile)>>,
     tx: UnboundedSender<Msg>,
@@ -185,6 +194,7 @@ impl Engine {
             inject_lock: tokio::sync::Mutex::new(()),
             process_lock: tokio::sync::Mutex::new(()),
             restarting_llm: AtomicBool::new(false),
+            preview_wide: AtomicBool::new(false),
             failed_audio: Mutex::new(None),
             audio,
             paths,
@@ -225,11 +235,17 @@ impl Engine {
         crate::tray::refresh(&self.app);
     }
 
-    /// The pill shows no text except a message, so the window is only as wide as what it shows
-    /// (D16): compact for the dot and bars, wide when a message must fit.
+    /// The window is only as wide as what the pill shows (D16): compact for the dot and bars,
+    /// wider for a message, widest for the live preview's words (D19).
     fn overlay(&self, kind: &'static str, message: Option<String>, hands_free: bool) {
         let Some(w) = self.app.get_webview_window("overlay") else { return };
-        let width = if message.is_some() { 340.0 } else { 184.0 };
+        let width = if message.is_some() {
+            340.0
+        } else if kind == "listening" && self.preview_wide.load(Ordering::SeqCst) {
+            PREVIEW_WIDTH
+        } else {
+            184.0
+        };
         let _ = self.app.emit_to("overlay", "overlay", Overlay { kind, message, hands_free });
         if kind == "hidden" {
             winutil::hide_overlay(&w);
@@ -306,6 +322,7 @@ impl Engine {
         let profile = resolve(&target.ctx, &s.app_rules, s.mode, s.auto_context);
         let id = self.session_seq.fetch_add(1, Ordering::SeqCst) + 1;
         *self.session.lock().unwrap() = Some(Session { id, target, profile });
+        self.preview_wide.store(false, Ordering::SeqCst);
         hotkey::set_recording(true);
         tracing::info!(app = %self.session.lock().unwrap().as_ref().map(|s| s.target.ctx.exe.clone()).unwrap_or_default(), mode = ?profile.mode, "recording started");
         self.overlay("listening", None, false);
@@ -320,11 +337,70 @@ impl Engine {
             self.overlay_hide_after(2500);
             return;
         }
+        if s.asr.live_preview {
+            self.spawn_preview(id);
+        }
         let tx = self.tx.clone();
         let max = Duration::from_secs(u64::from(s.audio.max_recording_secs));
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(max).await;
             let _ = tx.send(Msg::MaxDuration(id));
+        });
+    }
+
+    fn session_live(&self, id: u64) -> bool {
+        self.session.lock().unwrap().as_ref().is_some_and(|s| s.id == id)
+    }
+
+    /// Live preview (D19): while recording, re-transcribe the recent audio about twice a second
+    /// and show the words in the HUD. Display only: what gets pasted always comes from the full
+    /// recording after release, through the rules and the rewrite. Nothing here is logged.
+    fn spawn_preview(self: &Arc<Self>, id: u64) {
+        let me = self.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut shown = String::new();
+            loop {
+                tokio::time::sleep(Duration::from_millis(PREVIEW_EVERY_MS)).await;
+                if !me.session_live(id) {
+                    return;
+                }
+                let audio = me.audio.clone();
+                let peek = tauri::async_runtime::spawn_blocking(move || audio.peek(PREVIEW_WINDOW_SECS)).await;
+                let Ok(Some((samples, speech_ms))) = peek else { return };
+                if speech_ms < 300 {
+                    continue;
+                }
+                let s = me.settings();
+                let whisper = me.whisper.read().unwrap().clone();
+                let t = Instant::now();
+                let Ok(tr) =
+                    whisper.transcribe(&samples, &s.asr.language, &vocabulary_prompt(&s.dictionary.terms)).await
+                else {
+                    return; // engine not ready; the real transcription reports any problem
+                };
+                if t.elapsed() > Duration::from_millis(PREVIEW_MAX_ASR_MS) {
+                    // A slow (CPU) engine: more previews would delay the real transcription.
+                    tracing::info!(
+                        ms = t.elapsed().as_millis() as u64,
+                        "live preview off for this dictation: speech engine too slow"
+                    );
+                    return;
+                }
+                if !me.session_live(id) {
+                    return;
+                }
+                let Some(text) = asr_filter::clean(&tr.text, speech_ms) else { continue };
+                if text == shown {
+                    continue;
+                }
+                shown.clone_from(&text);
+                if !me.preview_wide.swap(true, Ordering::SeqCst)
+                    && let Some(w) = me.app.get_webview_window("overlay")
+                {
+                    winutil::show_overlay(&w, PREVIEW_WIDTH, 64.0, 56);
+                }
+                let _ = me.app.emit_to("overlay", "partial", text);
+            }
         });
     }
 

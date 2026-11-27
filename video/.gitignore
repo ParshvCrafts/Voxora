@@ -6,3 +6,4 @@ out/
 music/
 film/public/*.mp4
 film/public/*.wav
+speech2/out*/

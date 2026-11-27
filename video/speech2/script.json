@@ -1,0 +1,13 @@
+{
+ "engine": "kokoro",
+ "voice": "af_heart",
+ "scenes": [
+  {"id": "p1", "text": "Hey, um, can you write me a Python script that renames every photo in a folder by the date it was taken, actually no, by the date in the file name, and, uh, skip anything that isn't a JPEG."},
+  {"id": "p2", "text": "Okay so, um, I need a cover letter for a data science internship. Keep it under two hundred words, mention my PyTorch project, and make it sound confident but not, like, arrogant."},
+  {"id": "p3", "text": "So I'm getting this error, uh, CUDA out of memory, on batch size sixty four, can you explain why, and like, give me three ways to fix it without buying a new GPU?", "voice": "am_michael"},
+  {"id": "m1", "text": "integral from zero to one of x squared d x"},
+  {"id": "m2", "text": "sum from i equals one to n of x sub i squared"},
+  {"id": "m3", "text": "e to the i pi plus one equals zero"},
+  {"id": "m4", "text": "the fraction a plus b over two is greater than or equal to the square root of a b"}
+ ]
+}
