@@ -101,7 +101,7 @@ back-to-back (410 to 560 ms vs ~200 ms for the same clip), which is why in-app A
 
 | | |
 |---|---|
-| Installer (NSIS) | 4.45 MB |
+| Installer (NSIS) | 4.83 MB (v0.2.3, 5,064,967 bytes) |
 | Voxora process RAM (idle, release) | ~55 MB |
 | VRAM with both models loaded | 4.3 GB of 8 GB |
 | Download on first run | ~4.7 GB |

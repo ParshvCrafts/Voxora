@@ -1,0 +1,18 @@
+{
+ "engine": "kokoro",
+ "voice": "af_heart",
+ "scenes": [
+  {
+   "id": "math",
+   "text": "integral from zero to one of x squared d x"
+  },
+  {
+   "id": "code",
+   "text": "Rename the function to camel case get user by id and add a parameter called snake case max retries with a default of three."
+  },
+  {
+   "id": "corr",
+   "text": "Let's schedule the sync for Tuesday at two PM, actually no, make it Wednesday at four thirty PM."
+  }
+ ]
+}
