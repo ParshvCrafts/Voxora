@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/overlay.png" width="420" alt="The Voxora HUD while listening: a black capsule with a red recording dot, white live audio bars, and the active mode, Technical">
+  <img src="docs/assets/overlay.png" width="420" alt="The Voxora HUD while listening: a black capsule with a red recording dot and white live audio bars, nothing else">
 </p>
 
 Voxora is a local-first alternative to cloud dictation tools like Wispr Flow. It is built for
@@ -43,7 +43,8 @@ into `\sum_{i=1}^{n} x_i`.
   self-corrections, then an invariant guard rejects any rewrite that adds or drops a number or
   identifier, introduces a name you never said, or answers your question instead of
   transcribing it. Rejected rewrites fall back to the rule-based text.
-- **Nothing gets lost.** Every transcript is saved to SQLite before it is pasted. Your clipboard
+- **Nothing gets lost.** Every transcript is saved to SQLite before it is pasted (unless you turn
+  history off). Your clipboard
   (text or image) comes back after the paste. If the target blocks synthetic keystrokes (admin
   windows on Windows, Secure Keyboard Entry on macOS), the text waits on the clipboard and the
   HUD tells you.
@@ -94,7 +95,7 @@ how to reproduce them: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 |---|---|
 | Core benchmark (30 cases: fillers, self-corrections, ML jargon, code, math, prompt injection), synthesized speech | **29/30 pass** |
 | Golden set, 20 hard edge cases (URLs, paths, nested LaTeX, quotes, lists, Big-O, accented names, noise), Voxora's pipeline on reference text (the noise-only case needs audio, so 19 are scored) | **19/19 key facts, 16/19 exact** |
-| Same golden set as audio through Whisper, robotic Windows TTS voices | 11/20 key facts, 7/19 exact (misses are mishearings like "Reedy's cache" for Redis) |
+| Same golden set as audio through Whisper, robotic Windows TTS voices | 11/20 key facts, 7/19 exact (misses are mishearings like "SHAD256" for SHA-256 and "QEN 2.53B" for Qwen3.5-2B) |
 | Speech recognition, warm (whisper large-v3-turbo Q8, core benchmark) | P50 166 ms, P95 245 ms |
 | AI rewrite when used (Qwen3.5-4B Q4_K_M, core benchmark) | P50 357 ms, P95 929 ms |
 | End-to-end, key release to text in the app (real app, release build) | 0.45 to 0.77 s rule-based, 0.85 to 1.24 s with AI rewrite |
@@ -107,12 +108,20 @@ how to reproduce them: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 1. Download `Voxora_x.y.z_x64-setup.exe` from [Releases](https://github.com/ParshvCrafts/Voxora/releases) and run it.
    SmartScreen may warn because the installer is unsigned: click **More info**, then **Run anyway**.
-2. On first launch click **Download and start**. Voxora fetches pinned, SHA-256-verified builds
-   of whisper.cpp, llama.cpp and the models (about 4.7 GB with an NVIDIA GPU).
+2. On first launch the setup page shows exactly what this PC needs (about 4.7 GB with an NVIDIA
+   GPU, 2.2 GB without one) and lets you skip the AI rewrite. Click **Download and start**.
+   Voxora fetches pinned, SHA-256-verified builds of whisper.cpp, llama.cpp and the models,
+   and checks first that the drive has room for them.
 3. Click into any text field, hold **Right Alt**, speak, let go.
 
 An NVIDIA GPU with about 5 GB free VRAM is recommended. Without one, Voxora uses CPU builds and a
-smaller rewrite model, and you can turn the AI rewrite off for instant rule-based cleanup.
+smaller rewrite model, and you can skip the AI rewrite for instant rule-based cleanup (on the
+setup page, or later in Settings).
+
+The `.msi` on the release page is the same app as a Windows Installer package, for managed
+installs. To check a download, compare `certutil -hashfile <file> SHA256` with
+`SHA256SUMS.txt` on the release page. Voxora starts with Windows by default; turn that off in
+Settings. Closing the window keeps it running in the tray; **Settings > Quit Voxora** stops it.
 
 ### macOS 13.3+ on Apple silicon (beta)
 
@@ -135,7 +144,22 @@ smaller rewrite model, and you can turn the AI rewrite off for instant rule-base
 | Esc | Esc | Cancel while listening |
 | Ctrl+Alt+M | Control+Option+M | Switch mode |
 | Ctrl+Alt+V | Control+Option+V | Paste the last dictation again |
-| Ctrl+Z | Command+Z | Undo an insertion (in the app you dictated into) |
+| Ctrl+Z | Command+Z | The target app's own undo removes a paste (Voxora adds no undo of its own) |
+
+### Updating
+
+Download the new installer from [Releases](https://github.com/ParshvCrafts/Voxora/releases) and
+run it over the current install; models, history and settings are kept. Your version is shown
+under **Settings > About**. On macOS, replace the app in Applications, then turn Voxora off and
+on again under **Accessibility** (macOS ties the permission to the exact app build).
+
+### Uninstalling
+
+Windows: **Settings > Apps > Installed apps > Voxora > Uninstall**. macOS: quit Voxora and move
+it to the Trash. Either way, the downloaded models (about 5 GB), your dictation history and your
+settings stay in the data folder until you delete it: `%LOCALAPPDATA%\Voxora` on Windows,
+`~/Library/Application Support/Voxora` on macOS (**Settings > Open data folder** takes you there
+before you uninstall).
 
 ### Build from source
 
@@ -153,14 +177,13 @@ Models and runtimes are not in the repo; the app downloads them on first run int
 ## Status
 
 Verified:
-- 79 unit tests on Windows, and the same core suite plus macOS key-map tests on macOS (text
+- 87 unit tests on Windows, and the same core suite plus macOS key-map tests on macOS (text
   pipeline, golden-case rules, math parser, guard, storage, gesture timing, resampling, archive
   safety), plus an opt-in live clipboard round-trip test on Windows (`cargo test -- --ignored`).
 - Windows, on the hardware above: `scripts/e2e.ps1` drives the real app through a virtual audio
   cable (push-to-talk, hands-free auto-stop, Esc cancel, silence rejection, self-correction,
-  spoken math, clipboard restore), last run on v0.1; v0.2 was re-checked with unit tests, both
-  benchmarks and the real app's screenshots. A force-killed Voxora leaves no inference server
-  running.
+  spoken math, clipboard restore, dictating into Voxora's own window, Alt not left stuck),
+  9/9 passing on v0.2.3. A force-killed Voxora leaves no inference server running.
 - macOS, on GitHub's Apple silicon runners for every push: clippy and tests on the macOS code,
   `.app` and `.dmg` bundling, the bundled whisper-server transcribing a spoken sentence
   correctly (with the tiny English model, to keep CI fast), the pinned llama.cpp runtime passing
@@ -189,6 +212,12 @@ docs                 architecture, decisions, benchmarks, troubleshooting, resea
 ```
 
 Problems? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
+## Contributing
+
+Bug reports, wrong dictations, Mac test reports and pull requests are all welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md); planned work and good first issues are in
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License
 

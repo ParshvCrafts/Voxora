@@ -1,0 +1,21 @@
+name: Feature request
+description: An idea that would make Voxora better for you.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation, not only the solution. "When I dictate into X, I want ..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: checkboxes
+    id: local
+    attributes:
+      label: Local-first
+      options:
+        - label: This works without sending audio or text to a cloud service.

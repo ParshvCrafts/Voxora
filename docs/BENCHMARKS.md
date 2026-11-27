@@ -1,4 +1,4 @@
-﻿# Benchmarks
+# Benchmarks
 
 All numbers below were measured on one machine: Lenovo Legion 5i, Intel i9-14900HX, NVIDIA RTX 4060
 Laptop GPU (8 GB, driver 621.24), 32 GB RAM, Windows 11, 2026-11-23. Runtimes: whisper.cpp `b5907`
@@ -52,7 +52,7 @@ match** with the ideal string (whitespace-insensitive).
 | Synthesized speech through Whisper (Windows SAPI voices) | 11/20 | 7/19 | [golden-audio.md](../bench/results/golden-audio.md) |
 
 The gap between the two rows is speech recognition, not the pipeline: the robotic SAPI voices
-make Whisper hear "Reedy's cache" for Redis, "SHAD256" for SHA-256 and "RTX 4068GB" for
+make Whisper hear "SHAD256" for SHA-256, "QEN 2.53B" for Qwen3.5-2B and "RTX 4068GB" for
 "RTX 4060 8GB", and the voice itself reads `1e-4` aloud as "1 times 10 to the power of negative
 fourth". The text row shows what Voxora does with a correct transcript. Remaining exact-match
 misses with reference text: `\log(\hat{y}_i)` keeps parentheses (valid LaTeX, different

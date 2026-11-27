@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting guide
+    url: https://github.com/ParshvCrafts/Voxora/blob/main/docs/TROUBLESHOOTING.md
+    about: Common problems (key does nothing, nothing pastes, slow first dictation) and fixes.
+  - name: Security vulnerability
+    url: https://github.com/ParshvCrafts/Voxora/security/advisories/new
+    about: Report privately, please do not open a public issue.

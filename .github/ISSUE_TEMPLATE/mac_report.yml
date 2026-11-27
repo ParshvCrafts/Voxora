@@ -1,0 +1,30 @@
+name: macOS test report
+description: You tried the macOS beta on a real Mac. Tell us what worked and what did not.
+labels: [macos]
+body:
+  - type: markdown
+    attributes:
+      value: The macOS build has not been used by hand yet, so every report helps, including "it all worked".
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model and macOS version
+      placeholder: "MacBook Air M2, macOS 15.1"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: What worked?
+      options:
+        - label: Opening the app (Open Anyway) and the Accessibility permission
+        - label: Model download on first launch
+        - label: Holding Right Option to dictate
+        - label: Tapping Right Option for hands-free
+        - label: Text pasted into the app I was typing in
+        - label: My clipboard came back after the paste
+        - label: The HUD appeared without stealing focus
+  - type: textarea
+    id: notes
+    attributes:
+      label: What went wrong, or anything else?

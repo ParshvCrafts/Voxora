@@ -138,3 +138,18 @@ Settings. Kept: short messages for errors, warnings and notices (mic muted or un
 speech, model loading, paste fallback), since those are the only signal something went wrong.
 The window is now sized per state (184x64 DIP for dot and bars, 340x64 when a message must
 fit) and in the target monitor's DPI, so no transparent slab is left on screen.
+
+## D17: v0.2.3 audit fixes (2026-11-26)
+Two fresh-context audits (backend correctness, first-time-user journey) ranked findings by user
+impact; fixed the ones a user would hit. Paste keys and the trailing period now come from the
+first matching rule that sets them (a "Claude" title rule had made mintty, Alacritty and
+WezTerm paste with Ctrl+V, which does nothing there). Re-paste waits for Ctrl and Alt to be
+released rather than injecting an Alt key-up, which opens menu bars. The LLM timeout grows
+30 ms per word past 40 words, capped at 10 s, and dictations over 300 words skip the rewrite:
+22 of 27 real fallbacks in the owner's logs were timeouts on a fixed 2.5 s budget. Runtime
+unpack is all or nothing (extract beside, then rename), setup checks free space and runs once
+at a time, and the UI gets its download sizes from the backend (`setup_plan`) instead of a
+second copy of the asset-selection logic. Dictated text is always tagged to stay out of
+clipboard history. Guard messages, which quote the user's words, are logged by kind only.
+Deferred: an in-app update check (would add a network call), AltGr layout detection (a hint
+in Settings for now), and per-field validation when loading a hand-edited settings file.

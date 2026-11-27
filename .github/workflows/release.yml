@@ -75,6 +75,9 @@ jobs:
     needs: [windows, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -85,5 +88,7 @@ jobs:
           cd dist
           find . -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \) -exec mv {} . \;
           sha256sum *.exe *.msi *.dmg > SHA256SUMS.txt
+          # Install help first, then GitHub's generated list of changes.
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --generate-notes \
+            --notes-file ../.github/release-install.md \
             --title "Voxora $GITHUB_REF_NAME" *.exe *.msi *.dmg SHA256SUMS.txt

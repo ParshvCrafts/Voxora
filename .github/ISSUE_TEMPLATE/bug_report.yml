@@ -1,0 +1,50 @@
+name: Bug report
+description: Something broke, or a dictation came out wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Please check [TROUBLESHOOTING](https://github.com/ParshvCrafts/Voxora/blob/main/docs/TROUBLESHOOTING.md) first.
+        Only share dictated text you are happy to make public.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open VS Code  2. Hold Right Alt and say ...  3. ..."
+  - type: textarea
+    id: text
+    attributes:
+      label: Wrong dictation? Raw and final text from History
+      description: Open History, expand the entry, and paste both. Say which app and mode.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Voxora version (Settings > About)
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows 11, Windows 10, macOS 15, macOS 14, macOS 13, Other]
+    validations:
+      required: true
+  - type: input
+    id: hw
+    attributes:
+      label: GPU (from the Home page) and keyboard layout
+      placeholder: "RTX 3060 6 GB, US layout"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: "Settings > Open data folder > logs. Paste the lines around the problem (they never contain dictated text)."
+      render: text
