@@ -181,3 +181,15 @@ Chrome, RTX 4060 laptop, 25 s window at the time): ASR 166 to 179 ms on most 6.5
 the window is now 10 s to shorten each decode. Previews stop for a dictation if one takes over
 700 ms (CPU engines). E2E 9/9 with previews on. A real in-place composition (TSF text service)
 is on the roadmap.
+
+## D20: Launch film v2, silent, real use in Chrome (2026-11-27)
+Owner rejected v1: it demoed the app inside its own window, the music was weak, and the voice
+played only in fragments while the picture showed full sentences. v2 is silent, 31.6 s, 4:5, in
+the owner's editorial style (hard cuts between colour fields, mask-up Archivo type). It shows
+real dictations into ChatGPT and KaTeX's demo in a throwaway Chrome profile and leads with the new
+live preview (D19). Speech plays at a labelled 3x; key release to paste plays at a labelled real
+speed. The "You said / It typed" cards set the take's real raw and final text from the history
+database. One fresh critic round: it asked for a tighter HUD, a longer hold on the paste, fewer
+seconds of text cards and a cleaner KaTeX crop (all done). It also asked to re-record ChatGPT
+signed in; that was declined because it would put the owner's account on camera. Source and
+steps: `video/README.md`.

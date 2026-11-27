@@ -28,7 +28,7 @@ into `\sum_{i=1}^{n} x_i`. How it compares with Handy, OpenWhispr, Wispr Flow an
 sources and where they are ahead: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 <p align="center">
-  <img src="docs/assets/demo.gif" width="420" alt="A real recording: in Math mode, the spoken words integral from 0 to 1 of x squared d x become the LaTeX \int_{0}^{1} x^2 \, dx in Voxora's Try it box. The voice is synthesized.">
+  <img src="docs/assets/demo.gif" width="420" alt="A real recording in Chrome: while the dictation key is held, the Voxora HUD shows the words live, including um and actually no. On release, the cleaned prompt is pasted into ChatGPT 1.3 seconds later. Speech shown at 3x speed with a synthesized voice; release to paste at real speed.">
 </p>
 
 ## What it does

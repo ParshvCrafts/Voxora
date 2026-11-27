@@ -1,5 +1,23 @@
 # Demo video
 
+## v2 (current): silent launch film in Chrome
+
+1. Speech: `python ~/.claude/skills/product-video/scripts/tts.py speech2/script.json speech2/out --engine kokoro`,
+   then 16 kHz mono with a 1.2 s pink-noise lead as `speech2/out16/<id>.padded.wav` (see below for
+   why). Lines were pre-screened with `bench_eval --cases speech2/cases-tech.json --audio speech2/out16`.
+2. Release build running with `VOXORA_TEST_INJECTED=1`, mic = "CABLE Output", and an app rule
+   `title_contains: "KaTeX"` -> Math. Nobody using the PC.
+3. `PLAYWRIGHT=<path to playwright-core> CABLE_OUT="Speakers (2- VB-Audio Virtual Cable)" node capture-chrome.cjs p1 m1`
+   (fresh Chrome profile; prints what was pasted; capture-chrome.ps1 aborts with Esc if Chrome loses focus).
+4. `ffmpeg -i clips/p1.mkv -c:v libx264 -crf 12 -g 15 -an film/public/p1.mp4` (same for m1);
+   download Archivo (`Archivo[wdth,wght].ttf`, OFL) from github.com/google/fonts to
+   `film/public/fonts/Archivo.ttf`.
+5. `cd film && npx remotion render Launch out/launch.mp4 --codec=h264 --crf=16 && bash finish-launch.sh`
+   (poster as frame 0, silent master, README GIF, QA). Timing: `film/public/launch.json`;
+   plan and claims: `video.md`.
+
+## v1 (superseded)
+
 A 4:5 launch video built from real recordings of the app. Every product shot is the real
 Voxora window, the real HUD and real pasted output; the only staged part is the voice, which is
 synthesized and labelled on screen.
