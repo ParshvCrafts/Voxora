@@ -19,11 +19,13 @@
   <img src="docs/assets/overlay.png" width="420" alt="The Voxora HUD while listening: a black capsule with a red recording dot and white live audio bars, nothing else">
 </p>
 
-Voxora is a local-first alternative to cloud dictation tools like Wispr Flow. It is built for
+Voxora is free, MIT-licensed dictation for Windows and macOS that runs entirely on your
+computer, including the optional AI rewrite: no account, no cloud, no word limits. It is built for
 people who dictate into code editors, AI chats and LaTeX as often as into email: it keeps
 `snake_case` identifiers intact, knows that "FAISS" is not "phaistense", resolves "Tuesday at
 2, actually no, Wednesday" to Wednesday, and turns *"sigma from i equals 1 to n of x sub i"*
-into `\sum_{i=1}^{n} x_i`.
+into `\sum_{i=1}^{n} x_i`. How it compares with Handy, OpenWhispr, Wispr Flow and others, with
+sources and where they are ahead: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ## What it does
 
