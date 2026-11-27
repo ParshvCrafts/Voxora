@@ -51,7 +51,7 @@ const Card: React.FC<{ s: Extract<Scene, { type: "card" }>; d: FilmData; last?: 
           );
         })}
         {s.sub && (
-          <div style={{ marginTop: 36, font: `${d.weight ?? 700} 48px/1.2 ${d.font}`, color: d.palette.accent,
+          <div style={{ marginTop: 36, font: `600 48px/1.25 ${d.font}`, color: "rgba(245,245,247,0.72)",
             opacity: interpolate(f, [0.6 * fps, 1.0 * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>{s.sub}</div>
         )}
       </div>

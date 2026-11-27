@@ -30,3 +30,17 @@ npx remotion render Film out/film.mp4 --codec=h264 --crf=18
 
 Audio (dictation audio from the clips plus music) is mixed with ffmpeg afterwards; see
 `credits.md` for sources and licences.
+
+### Audio mix (before `film/finish.sh`)
+
+Scene starts in the film: math 2.6 s, correction 15.1 s, list 31.5 s (clip trims 0.9-10.8,
+0.9-14.7 and 2.3-21.5 s). Music is ducked under the dictation voice, then normalized to
+-14 LUFS with a -3 dBTP ceiling (AAC adds about 1 dB):
+
+```
+ffmpeg -i clips/math.mkv -i clips/corr.mkv -i clips/code.mkv -i music/Wallpaper.mp3 -filter_complex "[0:a]atrim=0.9:10.8,asetpts=PTS-STARTPTS,aresample=48000,pan=stereo|c0=c0|c1=c0,adelay=2600|2600[a1];[1:a]atrim=0.9:14.7,asetpts=PTS-STARTPTS,aresample=48000,pan=stereo|c0=c0|c1=c0,adelay=15100|15100[a2];[2:a]atrim=2.3:21.5,asetpts=PTS-STARTPTS,aresample=48000,pan=stereo|c0=c0|c1=c0,adelay=31500|31500[a3];[a1][a2][a3]amix=inputs=3:normalize=0:duration=longest,apad=whole_dur=58.5[speech];[3:a]aresample=48000,atrim=0:58.5,asetpts=PTS-STARTPTS,afade=t=in:d=1,afade=t=out:st=56:d=2.5,volume=0.4[mus];[speech]asplit[sp1][sp2];[mus][sp1]sidechaincompress=threshold=0.03:ratio=10:attack=15:release=500[duck];[duck][sp2]amix=inputs=2:normalize=0:duration=first,atrim=0:58.5[mix]" -map "[mix]" -c:a pcm_s16le film/out/mix.wav
+# pass 1: measure; pass 2: loudnorm=I=-14:TP=-3:LRA=11 with the measured_* values and linear=true -> film/out/mixn.wav
+```
+
+Outputs in `film/out/`: `voxora-launch.mp4` (master, captions burned in), `voxora-launch.srt`,
+`voxora-demo.gif` (README loop), `timeline.json`, QA sheets.
