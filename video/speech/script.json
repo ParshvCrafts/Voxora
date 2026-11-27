@@ -8,7 +8,8 @@
   },
   {
    "id": "code",
-   "text": "Rename the function to camel case get user by id and add a parameter called snake case max retries with a default of three."
+   "text": "Here are three blockers: first, CUDA out of memory on batch size sixty four; second, missing foreign key indexes; and third, flaky WebSocket reconnects.",
+   "voice": "am_michael"
   },
   {
    "id": "corr",

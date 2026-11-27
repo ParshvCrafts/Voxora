@@ -45,7 +45,9 @@ public static class K {
 $RALT = 0xA5; $ESC = 0x1B
 $root = Resolve-Path "$PSScriptRoot\.."
 $player = Join-Path $root "target\debug\examples\play_to_device.exe"
-$speech = Join-Path $PSScriptRoot "speech\out16\$Clip.wav"
+# 1.2 s of faint noise first (see video/README.md): the cable carries exact digital zeros until
+# the player is up, which a real mic never does, and that trips the "No sound from the mic" HUD.
+$speech = Join-Path $PSScriptRoot "speech\out16\$Clip.padded.wav"
 $clips = Join-Path $PSScriptRoot "clips"; New-Item -ItemType Directory -Force $clips | Out-Null
 $modeButton = @{ math = "Math / LaTeX"; code = "Technical"; corr = "Clean" }[$Clip]
 

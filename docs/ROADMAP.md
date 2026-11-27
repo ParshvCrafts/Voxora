@@ -37,6 +37,12 @@ Small, well-scoped, mostly in `crates/voxora-core` (pure Rust, testable without 
   speech detected") can briefly replace the pill of the one being recorded (`engine.rs`,
   `process`).
 - **More spoken symbols and units** in `normalize.rs`, each with a test.
+- **Spoken casing commands with natural voices:** Whisper often writes "camel case get user by
+  id" as "camelCase, get userbyid" or "snakeCaseMax retries"; the rules in `normalize.rs`
+  (`identifier_commands`) only handle the spaced and fully merged forms.
+- **Clear the "No sound from the mic" warning once sound arrives:** a mic that wakes up late
+  (some Bluetooth headsets) keeps the warning on the HUD for the whole dictation (`engine.rs`,
+  `DeadMic`).
 
 ## Not planned
 

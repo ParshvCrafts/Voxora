@@ -1,0 +1,28 @@
+{
+  "w": 1080, "h": 1350, "fps": 30,
+  "palette": { "bg": "#0b0b0d", "ink": "#f5f5f7", "accent": "#ff453a", "window": "#000000" },
+  "font": "'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif", "weight": 700,
+  "plate": { "file": "plate.mp4", "cssW": 1500, "cssH": 1156 },
+  "window": { "aspect": 1.15 },
+  "events": [],
+  "scenes": [
+    { "id": "hook", "type": "card", "dur": 2.6, "lines": ["Say math.", "Get LaTeX."], "accentWord": "LaTeX." },
+    { "id": "math", "type": "plate", "dur": 9.9, "from": 0, "cursor": false,
+      "note": "Real recording. Voice: synthesized.",
+      "caption": "You say: “integral from 0 to 1 of x squared d x”",
+      "camera": [ { "t": 0, "zoom": 1.05, "cx": 820, "cy": 600 }, { "t": 6.9, "zoom": 1.05, "cx": 820, "cy": 600 }, { "t": 7.5, "zoom": 2.3, "cx": 790, "cy": 520 } ] },
+    { "id": "card-corr", "type": "card", "dur": 2.6, "lines": ["Change your mind", "mid-sentence."], "sub": "It keeps the final answer." },
+    { "id": "corr", "type": "plate", "dur": 13.8, "from": 9.9, "cursor": false,
+      "note": "Real recording. Voice: synthesized.",
+      "caption": "You say: “Tuesday at 2 PM, actually no, make it Wednesday at 4:30 PM”",
+      "camera": [ { "t": 0, "zoom": 1.05, "cx": 820, "cy": 600 }, { "t": 10.8, "zoom": 1.05, "cx": 820, "cy": 600 }, { "t": 11.4, "zoom": 2.3, "cx": 790, "cy": 520 } ] },
+    { "id": "card-list", "type": "card", "dur": 2.6, "lines": ["Think out loud."], "sub": "Get a clean list." },
+    { "id": "list", "type": "plate", "dur": 19.5, "from": 23.7, "cursor": false,
+      "note": "Real recording. Voice: synthesized.",
+      "caption": "You say: “first, CUDA out of memory on batch size 64; second, …; and third, …”",
+      "camera": [ { "t": 0, "zoom": 1.05, "cx": 820, "cy": 600 }, { "t": 16.0, "zoom": 1.05, "cx": 820, "cy": 600 }, { "t": 16.6, "zoom": 2.3, "cx": 790, "cy": 530 } ] },
+    { "id": "turn", "type": "card", "dur": 3.6, "lines": ["All on your laptop."], "sub": "Speech and AI cleanup run locally. A guard rejects any AI rewrite that adds or drops a number or a name." },
+    { "id": "end", "type": "card", "dur": 4.2, "lines": ["Voxora"], "accentWord": "Voxora", "sub": "Free and open source. Windows, macOS beta. github.com/ParshvCrafts/Voxora" }
+  ],
+  "audio": []
+}
