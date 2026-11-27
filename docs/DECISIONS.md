@@ -153,3 +153,12 @@ second copy of the asset-selection logic. Dictated text is always tagged to stay
 clipboard history. Guard messages, which quote the user's words, are logged by kind only.
 Deferred: an in-app update check (would add a network call), AltGr layout detection (a hint
 in Settings for now), and per-field validation when loading a hand-edited settings file.
+
+## D18: Launch video is real capture with a labelled synthetic voice (2026-11-26)
+42 s, 4:5, sentence cards plus real recordings of Voxora's own window (Notepad restored the
+owner's other tabs; a second VS Code would not start from a VS Code terminal). The voice is
+Kokoro TTS played into a virtual mic and labelled on screen; lines were chosen by running
+candidates through `bench_eval` first, and each take was kept only if the pasted text was right.
+Speech is jump-cut for length (labelled "trimmed"); key release to paste is never cut or sped up.
+No voiceover (feeds play muted; ElevenLabs' free tier is non-commercial with a required credit).
+Music: Kevin MacLeod, "Wallpaper", CC BY 4.0. Source and steps: `video/README.md`.
