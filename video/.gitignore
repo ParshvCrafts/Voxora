@@ -3,3 +3,6 @@ speech/out/
 speech/out16/
 node_modules/
 out/
+music/
+film/public/*.mp4
+film/public/*.wav
