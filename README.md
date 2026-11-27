@@ -93,7 +93,7 @@ how to reproduce them: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 | | Result |
 |---|---|
-| Core benchmark (30 cases: fillers, self-corrections, ML jargon, code, math, prompt injection), synthesized speech | **29/30 pass** |
+| Core benchmark (30 cases: fillers, self-corrections, ML jargon, code, math, prompt injection), synthesized speech | **29/30 pass** (28/30 in a v0.2.3 re-run: Whisper misheard one jargon word) |
 | Golden set, 20 hard edge cases (URLs, paths, nested LaTeX, quotes, lists, Big-O, accented names, noise), Voxora's pipeline on reference text (the noise-only case needs audio, so 19 are scored) | **19/19 key facts, 16/19 exact** |
 | Same golden set as audio through Whisper, robotic Windows TTS voices | 11/20 key facts, 7/19 exact (misses are mishearings like "SHAD256" for SHA-256 and "QEN 2.53B" for Qwen3.5-2B) |
 | Speech recognition, warm (whisper large-v3-turbo Q8, core benchmark) | P50 166 ms, P95 245 ms |

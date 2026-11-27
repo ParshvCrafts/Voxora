@@ -28,6 +28,8 @@ Only 11 of 30 cases reached the LLM; the rest were finished by the deterministic
 
 Per-case output: [qwen3.5-4b](../bench/results/qwen3.5-4b.md), [qwen3.5-2b](../bench/results/qwen3.5-2b.md).
 
+Re-run for v0.2.3 (2026-11-26, same hardware): [28/30](../bench/results/qwen3.5-4b-v0.2.3.md), WER 9.0%, ASR P50/P95 175/257 ms, rewrite 378/957 ms, 0 guard or timeout fallbacks. The extra miss is `jarg-03`: Whisper now hears "heterosidasticity". v0.2.2's code gives the same transcript for that clip today, so the change is in speech recognition run to run, not in this release.
+
 ### Reproduce
 
 ```powershell
