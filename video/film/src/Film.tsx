@@ -12,7 +12,7 @@ type Ev = { t: number; do: string; point?: Pt; box?: { x: number; y: number; w: 
 type Cam = { t: number; zoom: number; cx?: number; cy?: number; focus?: number };
 export type Scene =
   | { id: string; type: "card"; dur: number; lines: string[]; sub?: string; accentWord?: string }
-  | { id: string; type: "plate"; dur: number; from: number; camera?: Cam[]; caption?: string; cursor?: boolean; note?: string };
+  | { id: string; type: "plate"; dur: number; from: number; camera?: Cam[]; caption?: string; cursor?: boolean; note?: string; hardIn?: boolean; hardOut?: boolean };
 export type FilmData = {
   w: number; h: number; fps: number;
   palette: { bg: string; ink: string; accent: string; window?: string };
@@ -41,7 +41,7 @@ const Card: React.FC<{ s: Extract<Scene, { type: "card" }>; d: FilmData; last?: 
         {s.lines.map((line, i) => {
           const p = interpolate(f, [(0.1 + i * 0.08) * fps, (0.7 + i * 0.08) * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease });
           return (
-            <div key={i} style={{ overflow: "hidden", paddingBottom: 12 }}>
+            <div key={i} style={{ overflow: "hidden", paddingBottom: 26 }}>
               <div style={{ transform: `translateY(${(1 - p) * 110}%)`, font: `${d.weight ?? 700} 92px/1.0 ${d.font}`, color: d.palette.ink, letterSpacing: "-0.01em" }}>
                 {s.accentWord && line.includes(s.accentWord)
                   ? <>{line.split(s.accentWord)[0]}<span style={{ color: d.palette.accent }}>{s.accentWord}</span>{line.split(s.accentWord)[1]}</>
@@ -92,8 +92,9 @@ const Plate: React.FC<{ s: Extract<Scene, { type: "plate" }>; d: FilmData }> = (
   const half = { x: winW / (2 * scale * z), y: winH / (2 * scale * z) }; // visible half-extent, CSS px
   const cx = Math.min(P.cssW - half.x, Math.max(half.x, c.cx)), cy = Math.min(P.cssH - half.y, Math.max(half.y, c.cy));
   const toWin = (p: Pt) => ({ x: (p.x - cx) * scale * z + winW / 2, y: (p.y - cy) * scale * z + winH / 2 });
-  const enter = interpolate(f, [0, 0.5 * fps], [0, 1], { extrapolateRight: "clamp", easing: ease });
-  const exit = interpolate(f, [s.dur * fps - 0.35 * fps, s.dur * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: inOut });
+  // hardIn/hardOut: a jump cut inside one recording (no slide or fade at that boundary).
+  const enter = s.hardIn ? 1 : interpolate(f, [0, 0.25 * fps], [0, 1], { extrapolateRight: "clamp", easing: ease });
+  const exit = s.hardOut ? 0 : interpolate(f, [s.dur * fps - 0.25 * fps, s.dur * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: inOut });
 
   // Cursor: eased travel between logged action points (0.6 s before each), ripple on clicks.
   const acts = ev.filter(e => e.point && (e.do === "click" || e.do === "hover" || e.do === "type"));
@@ -114,7 +115,7 @@ const Plate: React.FC<{ s: Extract<Scene, { type: "plate" }>; d: FilmData }> = (
       {/* Fixed width: a long caption must wrap, never widen the wrapper and push the window off-centre. */}
       <div style={{ width: winW, transform: `translateY(${(1 - enter) * 80 - exit * 120}px)`, opacity: enter * (1 - exit) }}>
         {s.note && (
-          <div style={{ marginBottom: 20, font: `500 44px/1.1 ${d.font}`, color: "rgba(245,245,247,0.55)" }}>{s.note}</div>
+          <div style={{ marginBottom: 20, font: `500 44px/1.1 ${d.font}`, color: "rgba(245,245,247,0.78)" }}>{s.note}</div>
         )}
         <div style={{ width: winW, height: winH, borderRadius: 18, overflow: "hidden", position: "relative",
           background: d.palette.window ?? "#000", boxShadow: "0 30px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08)" }}>

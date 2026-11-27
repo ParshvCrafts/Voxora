@@ -27,6 +27,10 @@ people who dictate into code editors, AI chats and LaTeX as often as into email:
 into `\sum_{i=1}^{n} x_i`. How it compares with Handy, OpenWhispr, Wispr Flow and others, with
 sources and where they are ahead: [docs/COMPARISON.md](docs/COMPARISON.md).
 
+<p align="center">
+  <img src="docs/assets/demo.gif" width="420" alt="A real recording: in Math mode, the spoken words integral from 0 to 1 of x squared d x become the LaTeX \int_{0}^{1} x^2 \, dx in Voxora's Try it box. The voice is synthesized.">
+</p>
+
 ## What it does
 
 - **One key, two gestures.** Hold Right Alt (Right Option on a Mac) to talk; tap it to keep

@@ -28,16 +28,18 @@
     "Say math.",
     "Get LaTeX."
    ],
-   "accentWord": "LaTeX."
+   "accentWord": "LaTeX.",
+   "sub": "On your laptop. No cloud."
   },
   {
-   "id": "math",
+   "id": "math-a",
    "type": "plate",
-   "dur": 9.9,
+   "dur": 4.0,
    "from": 0,
    "cursor": false,
-   "note": "Real recording. Voice: synthesized.",
+   "note": "Real recording, trimmed. Voice: synthesized.",
    "caption": "You say: “integral from 0 to 1 of x squared d x”",
+   "hardOut": true,
    "camera": [
     {
      "t": 0,
@@ -52,13 +54,37 @@
      "cy": 800
     },
     {
-     "t": 6.6,
-     "zoom": 1.65,
+     "t": 4.0,
+     "zoom": 1.6,
      "cx": 740,
-     "cy": 820
+     "cy": 810
+    }
+   ]
+  },
+  {
+   "id": "math-b",
+   "type": "plate",
+   "dur": 3.9,
+   "from": 6.0,
+   "cursor": false,
+   "note": "Real recording, trimmed. Voice: synthesized.",
+   "caption": "You say: “integral from 0 to 1 of x squared d x”",
+   "hardIn": true,
+   "camera": [
+    {
+     "t": 0,
+     "zoom": 1.6,
+     "cx": 740,
+     "cy": 810
     },
     {
-     "t": 7.4,
+     "t": 0.7,
+     "zoom": 1.6,
+     "cx": 740,
+     "cy": 810
+    },
+    {
+     "t": 1.2999999999999998,
      "zoom": 2.3,
      "cx": 700,
      "cy": 525
@@ -76,13 +102,14 @@
    "sub": "It keeps the final answer."
   },
   {
-   "id": "corr",
+   "id": "corr-a",
    "type": "plate",
-   "dur": 13.8,
+   "dur": 4.5,
    "from": 9.9,
    "cursor": false,
-   "note": "Real recording. Voice: synthesized.",
+   "note": "Real recording, trimmed. Voice: synthesized.",
    "caption": "You say: “Tuesday at 2 PM, actually no, make it Wednesday at 4:30 PM”",
+   "hardOut": true,
    "camera": [
     {
      "t": 0,
@@ -97,15 +124,39 @@
      "cy": 800
     },
     {
-     "t": 10.6,
-     "zoom": 1.65,
+     "t": 4.5,
+     "zoom": 1.6,
      "cx": 740,
-     "cy": 820
+     "cy": 810
+    }
+   ]
+  },
+  {
+   "id": "corr-b",
+   "type": "plate",
+   "dur": 4.2,
+   "from": 19.5,
+   "cursor": false,
+   "note": "Real recording, trimmed. Voice: synthesized.",
+   "caption": "You say: “Tuesday at 2 PM, actually no, make it Wednesday at 4:30 PM”",
+   "hardIn": true,
+   "camera": [
+    {
+     "t": 0,
+     "zoom": 1.6,
+     "cx": 740,
+     "cy": 810
     },
     {
-     "t": 11.4,
-     "zoom": 2.3,
-     "cx": 700,
+     "t": 1.0,
+     "zoom": 1.6,
+     "cx": 740,
+     "cy": 810
+    },
+    {
+     "t": 1.6,
+     "zoom": 1.9,
+     "cx": 770,
      "cy": 525
     }
    ]
@@ -120,13 +171,14 @@
    "sub": "Get a clean list."
   },
   {
-   "id": "list",
+   "id": "list-a",
    "type": "plate",
-   "dur": 19.2,
+   "dur": 5.0,
    "from": 23.7,
    "cursor": false,
-   "note": "Real recording. Voice: synthesized.",
+   "note": "Real recording, trimmed. Voice: synthesized.",
    "caption": "You say: “first, CUDA out of memory on batch size 64; second, …; and third, …”",
+   "hardOut": true,
    "camera": [
     {
      "t": 0,
@@ -141,13 +193,37 @@
      "cy": 800
     },
     {
-     "t": 16.0,
-     "zoom": 1.65,
+     "t": 5.0,
+     "zoom": 1.6,
      "cx": 740,
-     "cy": 820
+     "cy": 810
+    }
+   ]
+  },
+  {
+   "id": "list-b",
+   "type": "plate",
+   "dur": 4.6,
+   "from": 38.3,
+   "cursor": false,
+   "note": "Real recording, trimmed. Voice: synthesized.",
+   "caption": "You say: “first, CUDA out of memory on batch size 64; second, …; and third, …”",
+   "hardIn": true,
+   "camera": [
+    {
+     "t": 0,
+     "zoom": 1.6,
+     "cx": 740,
+     "cy": 810
     },
     {
-     "t": 16.8,
+     "t": 1.5,
+     "zoom": 1.6,
+     "cx": 740,
+     "cy": 810
+    },
+    {
+     "t": 2.1,
      "zoom": 2.3,
      "cx": 700,
      "cy": 525
@@ -161,7 +237,7 @@
    "lines": [
     "All on your laptop."
    ],
-   "sub": "Speech and AI cleanup run locally. A guard rejects any AI rewrite that adds or drops a number or a name."
+   "sub": "Whisper and a local AI. A guard blocks any rewrite that changes your facts."
   },
   {
    "id": "end",
